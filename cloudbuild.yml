@@ -1,0 +1,7 @@
+steps:
+  - name: 'gcr.io/cloud-builders/gsutil'
+    id: GET_SETTINGS
+    args: ['cp', 'gs://salus-mavenrepository/m2-settings.xml', '.mvn/settings.xml']
+  - name: 'gcr.io/cloud-builders/mvn'
+    id: COMPILE
+    args: ['compile', '.mvn/settings.xml']
