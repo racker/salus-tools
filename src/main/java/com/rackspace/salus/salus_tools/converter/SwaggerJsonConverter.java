@@ -1,4 +1,4 @@
-package Salus_tools.converter;
+package com.rackspace.salus.salus_tools.converter;
 
 
 
@@ -14,16 +14,36 @@ import java.util.Scanner;
 
 public class SwaggerJsonConverter {
 
+    /**
+     * This function
+     * @param args
+     * 0. path to the location that the swagger.json is and to where we will output the resultant json from this
+     * 1. should be "tenant/{tenantId}" or {tenandId} depending on whether the API has /tenant in the path
+     * 2,3. From this point forward we will have tuples of replacement rules.
+     * The first argument will be the text to be replaced and the second argument will be the text to replace it with.
+     * @throws Exception
+     */
     public static void main(String[] args) throws Exception {
+        System.out.println("we have x arguments" + args.length);
+
         ObjectMapper mapper = new ObjectMapper();
         String content = new Scanner(new File(args[0]+"/swagger.json")).useDelimiter("\\Z").next();
         ObjectNode root = (ObjectNode)mapper.readTree(content);
         Map<String, JsonNode> temp = new HashMap();
+
+        //new option... place everything in temp... Then
+        String newKey = null;
         for (Iterator<Map.Entry<String, JsonNode>> it = root.get("paths").fields(); it.hasNext(); ) {
             Map.Entry<String, JsonNode> elt = it.next();
-            if (elt.getKey().contains("tenant"))
+            newKey = elt.getKey();
+            for(int i = 2; i < args.length; i+=2) {
+
+                newKey = newKey.replace(args[i], args[i+1]);
+            }
+
+            if (elt.getKey().contains(args[1]))
             {
-                String newKey = elt.getKey().replace("tenant/{tenantId}/", "");
+                newKey = newKey.replace(args[1], "");
                 temp.put(newKey, elt.getValue());
                 /*
                 attempting to remove the parameters but is failing on array index out of bounds exception
