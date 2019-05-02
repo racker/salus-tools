@@ -30,41 +30,32 @@ public class SwaggerJsonConverter {
         ObjectNode root = (ObjectNode)mapper.readTree(content);
         Map<String, JsonNode> temp = new HashMap();
 
-        //new option... place everything in temp... Then
         String newKey = null;
         for (Iterator<Map.Entry<String, JsonNode>> it = root.get("paths").fields(); it.hasNext(); ) {
             Map.Entry<String, JsonNode> elt = it.next();
             newKey = elt.getKey();
-            for(int i = 2; i < args.length; i++) {
-
-                newKey = newKey.replace(args[i].split(argDelimiter)[0], args[i].split(argDelimiter)[1]);
+            for(int i = 1; i < args.length; i++) {
+                String[] splitValues = args[1].split(argDelimiter);
+                newKey = newKey.replace(args[i].split(argDelimiter)[0], splitValues.length == 1? "" : splitValues[1]);
             }
+            /*
+            attempting to remove the parameters but is failing on array index out of bounds exception
 
-            if (elt.getKey().contains(args[1]))
-            {
-                newKey = newKey.replace(args[1].split(argDelimiter)[0], args[1].split(argDelimiter)[1]);
-                temp.put(newKey, elt.getValue());
-                /*
-                attempting to remove the parameters but is failing on array index out of bounds exception
-
-                elt.getValue().fields().forEachRemaining((webVerbs)->{
-                    int i = 0;
-                    for (Iterator<Map.Entry<String, JsonNode>> parameters = elt.getValue().get("parameters").fields(); parameters.hasNext(); ) {
-                        Map.Entry<String, JsonNode> parameter = parameters.next();
-                        if (parameter.getValue().get("name").asText().compareTo("tenantId") == 0) {
-                            //parameters is an array
-                            ((ArrayNode)temp.get(webVerbs.getKey()).get("parameters")).remove(i);
-                            break;
-                        }
-                        i++;
+            elt.getValue().fields().forEachRemaining((webVerbs)->{
+                int i = 0;
+                for (Iterator<Map.Entry<String, JsonNode>> parameters = elt.getValue().get("parameters").fields(); parameters.hasNext(); ) {
+                    Map.Entry<String, JsonNode> parameter = parameters.next();
+                    if (parameter.getValue().get("name").asText().compareTo("tenantId") == 0) {
+                        //parameters is an array
+                        ((ArrayNode)temp.get(webVerbs.getKey()).get("parameters")).remove(i);
+                        break;
                     }
-                });*/
+                    i++;
+                }
+            });*/
+            temp.put(newKey, elt.getValue());
 
-                it.remove();
-
-            } else {
-                it.remove();
-            }
+            it.remove();
         }
         ObjectNode pathNode = mapper.getNodeFactory().objectNode();
 
