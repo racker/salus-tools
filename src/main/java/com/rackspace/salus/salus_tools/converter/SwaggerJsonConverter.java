@@ -24,8 +24,6 @@ public class SwaggerJsonConverter {
      * @throws Exception
      */
     public static void main(String[] args) throws Exception {
-        System.out.println("we have x arguments" + args.length);
-
         ObjectMapper mapper = new ObjectMapper();
         String content = new Scanner(new File(args[0]+"/swagger.json")).useDelimiter("\\Z").next();
         ObjectNode root = (ObjectNode)mapper.readTree(content);
