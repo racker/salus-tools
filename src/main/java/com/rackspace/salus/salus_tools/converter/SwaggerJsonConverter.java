@@ -36,7 +36,7 @@ public class SwaggerJsonConverter {
             newKey = elt.getKey();
             for(int i = 1; i < args.length; i++) {
                 String[] splitValues = args[1].split(argDelimiter);
-                newKey = newKey.replace(args[i].split(argDelimiter)[0], splitValues.length == 1? "" : splitValues[1]);
+                newKey = splitValues[0], splitValues.length == 1? "" : splitValues[1]);
             }
             /*
             attempting to remove the parameters but is failing on array index out of bounds exception
