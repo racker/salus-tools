@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Scanner;
 
 public class SwaggerJsonConverter {
+    static final String argDelimiter="=";
 
     /**
      * This function
@@ -34,14 +35,14 @@ public class SwaggerJsonConverter {
         for (Iterator<Map.Entry<String, JsonNode>> it = root.get("paths").fields(); it.hasNext(); ) {
             Map.Entry<String, JsonNode> elt = it.next();
             newKey = elt.getKey();
-            for(int i = 2; i < args.length; i+=2) {
+            for(int i = 2; i < args.length; i++) {
 
-                newKey = newKey.replace(args[i], args[i+1]);
+                newKey = newKey.replace(args[i].split(argDelimiter)[0], args[i].split(argDelimiter)[1]);
             }
 
             if (elt.getKey().contains(args[1]))
             {
-                newKey = newKey.replace(args[1], "");
+                newKey = newKey.replace(args[1].split(argDelimiter)[0], args[1].split(argDelimiter)[1]);
                 temp.put(newKey, elt.getValue());
                 /*
                 attempting to remove the parameters but is failing on array index out of bounds exception
