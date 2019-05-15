@@ -7,6 +7,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -68,8 +71,8 @@ public class SwaggerJsonConverter {
         });
         root.set("paths", pathNode);
         // if this fails to create the directory then the public documentation wont get generated
-        new java.io.File(args[0]+"/public/").mkdir();
-        mapper.writeValue(new java.io.File(args[0] + "/public/swagger.json"), (JsonNode) root);
+        Path parent= Files.createDirectory(Paths.get(args[0] +"/public/"));
+        mapper.writeValue(parent.resolve("swagger.json").toFile(), (JsonNode) root);
 
     }
 }
