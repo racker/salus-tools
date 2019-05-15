@@ -67,7 +67,9 @@ public class SwaggerJsonConverter {
             pathNode.set(key, node);
         });
         root.set("paths", pathNode);
-        mapper.writeValue(new java.io.File(args[0]+"/convertedOutput.json"), (JsonNode)root);
+        // if this fails to create the directory then the public documentation wont get generated
+        new java.io.File(args[0]+"/public/").mkdir();
+        mapper.writeValue(new java.io.File(args[0] + "/public/swagger.json"), (JsonNode) root);
 
     }
 }
