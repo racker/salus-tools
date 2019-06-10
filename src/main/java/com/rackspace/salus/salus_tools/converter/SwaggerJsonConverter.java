@@ -6,11 +6,17 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import com.github.kongchen.swagger.docgen.mavenplugin.ApiSource;
+import io.swagger.models.ExternalDocs;
+import io.swagger.models.Info;
+import io.swagger.util.DeserializationModule;
 import java.io.File;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Scanner;
+import org.apache.maven.plugin.logging.Log;
+import org.apache.maven.plugin.logging.SystemStreamLog;
 
 public class SwaggerJsonConverter {
     static final String argDelimiter="=";
@@ -25,8 +31,11 @@ public class SwaggerJsonConverter {
      * @throws Exception
      */
     public static void main(String[] args) throws Exception {
+        DeserializationModule dm = new DeserializationModule();
+
         ObjectMapper mapper = new ObjectMapper();
-        String content = new Scanner(new File(args[0]+"/swagger.json")).useDelimiter("\\Z").next();
+        mapper.registerModule(dm);
+        String content = new Scanner(new File("/Users/geor7956/incoming/olddoc/swagger.json")).useDelimiter("\\Z").next();
         ObjectNode root = (ObjectNode)mapper.readTree(content);
         Map<String, JsonNode> temp = new HashMap();
 
@@ -67,7 +76,22 @@ public class SwaggerJsonConverter {
             pathNode.set(key, node);
         });
         root.set("paths", pathNode);
-        mapper.writeValue(new java.io.File(args[0]+"/convertedOutput.json"), (JsonNode)root);
+        mapper.writeValue(new java.io.File("/tmp/convertedOutput.json"), (JsonNode)root);
 
+        Info info = new Info();
+        ExternalDocs externalDocs = new ExternalDocs();
+        System.out.println("gbj printed doc3");
+
+        ApiSource apiSource = new ApiSource();
+        apiSource.setOutputPath("/tmp/gbj1.html");
+        apiSource.setHost("");
+        apiSource.setBasePath("");
+        apiSource.setInfo(info);
+        apiSource.setTemplatePath("/Users/geor7956/incoming/s4/salus-telemetry-bundle/apps/monitor-management/templates/strapdown.html.hbs");
+        Log log = new SystemStreamLog();
+
+        HtmlGenerator htmlGenerator = new HtmlGenerator(apiSource, log, mapper.writeValueAsString((JsonNode)root));
+        htmlGenerator.toDocuments();
+        System.out.println("gbj printed doc");
     }
 }
