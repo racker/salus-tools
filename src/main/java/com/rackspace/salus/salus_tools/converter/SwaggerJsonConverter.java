@@ -24,18 +24,16 @@ public class SwaggerJsonConverter {
     /**
      * This function
      * @param args
-     * 0. path to the location that the swagger.json is and to where we will output the resultant json from this
-     * 1. should be "tenant/{tenantId}"= or {tenandId}= depending on whether the API has /tenant in the path
-     * 2. Each argument should be in the format "StringToBeReplaced"="replacementText".
+     * 0. path to the location that the swagger.json is and to where we will output the resultant json/html from this
+     * 1. path/filename of hbs template to be used when the html is generated.
+     * 2. should be "tenant/{tenantId}"= or {tenandId}= depending on whether the API has /tenant in the path
+     * 3. Each succeeding argument should be in the format "StringToBeReplaced"="replacementText".
      *    If you want to remove a string then it should be "StringToBeReplaced"=    with no replacmentText
      * @throws Exception
      */
     public static void main(String[] args) throws Exception {
-        DeserializationModule dm = new DeserializationModule();
-
         ObjectMapper mapper = new ObjectMapper();
-        mapper.registerModule(dm);
-        String content = new Scanner(new File("/Users/geor7956/incoming/olddoc/swagger.json")).useDelimiter("\\Z").next();
+        String content = new Scanner(new File(args[0]+"/swagger.json")).useDelimiter("\\Z").next();
         ObjectNode root = (ObjectNode)mapper.readTree(content);
         Map<String, JsonNode> temp = new HashMap();
 
@@ -45,7 +43,7 @@ public class SwaggerJsonConverter {
             Map.Entry<String, JsonNode> elt = it.next();
             newKey = elt.getKey();
             containsTenant = newKey.contains("tenant");
-            for(int i = 1; i < args.length; i++) {
+            for(int i = 2; i < args.length; i++) {
                 String[] splitValues = args[i].split(argDelimiter);
                 newKey = newKey.replace(splitValues[0], splitValues.length == 1? "" : splitValues[1]);
             }
@@ -76,18 +74,18 @@ public class SwaggerJsonConverter {
             pathNode.set(key, node);
         });
         root.set("paths", pathNode);
-        mapper.writeValue(new java.io.File("/tmp/convertedOutput.json"), (JsonNode)root);
+        mapper.writeValue(new java.io.File(args[0]+"/convertedOutput.json"), (JsonNode)root);
 
         Info info = new Info();
         ExternalDocs externalDocs = new ExternalDocs();
         System.out.println("gbj printed doc3");
 
         ApiSource apiSource = new ApiSource();
-        apiSource.setOutputPath("/tmp/gbj1.html");
+        apiSource.setOutputPath(args[0] + "/converted.html");
         apiSource.setHost("");
         apiSource.setBasePath("");
         apiSource.setInfo(info);
-        apiSource.setTemplatePath("/Users/geor7956/incoming/s4/salus-telemetry-bundle/apps/monitor-management/templates/strapdown.html.hbs");
+        apiSource.setTemplatePath(args[1]);
         Log log = new SystemStreamLog();
 
         HtmlGenerator htmlGenerator = new HtmlGenerator(apiSource, log, mapper.writeValueAsString((JsonNode)root));
