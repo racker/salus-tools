@@ -7,9 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import com.github.kongchen.swagger.docgen.mavenplugin.ApiSource;
-import io.swagger.models.ExternalDocs;
 import io.swagger.models.Info;
-import io.swagger.util.DeserializationModule;
 import java.io.File;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -19,7 +17,7 @@ import org.apache.maven.plugin.logging.Log;
 import org.apache.maven.plugin.logging.SystemStreamLog;
 
 public class SwaggerJsonConverter {
-    static final String argDelimiter="=";
+    private static final String argDelimiter="=";
 
     /**
      * This function
@@ -35,9 +33,9 @@ public class SwaggerJsonConverter {
         ObjectMapper mapper = new ObjectMapper();
         String content = new Scanner(new File(args[0]+"/swagger.json")).useDelimiter("\\Z").next();
         ObjectNode root = (ObjectNode)mapper.readTree(content);
-        Map<String, JsonNode> temp = new HashMap();
+        Map<String, JsonNode> temp = new HashMap<>();
 
-        String newKey = null;
+        String newKey;
         boolean containsTenant;
         for (Iterator<Map.Entry<String, JsonNode>> it = root.get("paths").fields(); it.hasNext(); ) {
             Map.Entry<String, JsonNode> elt = it.next();
@@ -77,13 +75,11 @@ public class SwaggerJsonConverter {
         mapper.writeValue(new java.io.File(args[0]+"/convertedOutput.json"), (JsonNode)root);
 
         generateHtml(args, mapper, root);
-        return;
     }
 
     private static void generateHtml(String[] args, ObjectMapper mapper, JsonNode root)
         throws Exception {
         Info info = new Info();
-        ExternalDocs externalDocs = new ExternalDocs();
         ApiSource apiSource = new ApiSource();
         apiSource.setOutputPath(args[0] + "/converted.html");
         apiSource.setHost("");
