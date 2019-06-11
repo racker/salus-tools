@@ -10,6 +10,7 @@ import org.apache.maven.plugin.logging.Log;
 
 
 import java.util.Set;
+// Do just enough to allow creation of concrete child class
 public class HtmlGenerator extends AbstractDocumentSource {
 
   HtmlGenerator(ApiSource apiSource, Log log, String swagger) throws Exception {

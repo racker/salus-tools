@@ -79,15 +79,20 @@ public class SwaggerJsonConverter {
 
     private static void generateHtml(String[] args, ObjectMapper mapper, JsonNode root)
         throws Exception {
-        Info info = new Info();
+
+        // Configure the generator
         ApiSource apiSource = new ApiSource();
         apiSource.setOutputPath(args[0] + "/converted.html");
+        apiSource.setTemplatePath(args[1]);
+
+        // Clear out some configuration to reduce the work done by the generator
+        Info info = new Info();
         apiSource.setHost("");
         apiSource.setBasePath("");
         apiSource.setInfo(info);
-        apiSource.setTemplatePath(args[1]);
         Log log = new SystemStreamLog();
 
+        // Invoke the generator used by the swagger maven plugin
         HtmlGenerator htmlGenerator = new HtmlGenerator(apiSource, log, mapper.writeValueAsString(
             root));
         htmlGenerator.toDocuments();
