@@ -76,10 +76,14 @@ public class SwaggerJsonConverter {
         root.set("paths", pathNode);
         mapper.writeValue(new java.io.File(args[0]+"/convertedOutput.json"), (JsonNode)root);
 
+        generateHtml(args, mapper, root);
+        return;
+    }
+
+    private static void generateHtml(String[] args, ObjectMapper mapper, JsonNode root)
+        throws Exception {
         Info info = new Info();
         ExternalDocs externalDocs = new ExternalDocs();
-        System.out.println("gbj printed doc3");
-
         ApiSource apiSource = new ApiSource();
         apiSource.setOutputPath(args[0] + "/converted.html");
         apiSource.setHost("");
@@ -88,8 +92,8 @@ public class SwaggerJsonConverter {
         apiSource.setTemplatePath(args[1]);
         Log log = new SystemStreamLog();
 
-        HtmlGenerator htmlGenerator = new HtmlGenerator(apiSource, log, mapper.writeValueAsString((JsonNode)root));
+        HtmlGenerator htmlGenerator = new HtmlGenerator(apiSource, log, mapper.writeValueAsString(
+            root));
         htmlGenerator.toDocuments();
-        System.out.println("gbj printed doc");
     }
 }
