@@ -6,21 +6,26 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import com.github.kongchen.swagger.docgen.mavenplugin.ApiSource;
+import io.swagger.models.Info;
 import java.io.File;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Scanner;
+import org.apache.maven.plugin.logging.Log;
+import org.apache.maven.plugin.logging.SystemStreamLog;
 
 public class SwaggerJsonConverter {
-    static final String argDelimiter="=";
+    private static final String argDelimiter="=";
 
     /**
      * This function
      * @param args
-     * 0. path to the location that the swagger.json is and to where we will output the resultant json from this
-     * 1. should be "tenant/{tenantId}"= or {tenandId}= depending on whether the API has /tenant in the path
-     * 2. Each argument should be in the format "StringToBeReplaced"="replacementText".
+     * 0. path to the location that the swagger.json is and to where we will output the resultant json/html from this
+     * 1. path/filename of hbs template to be used when the html is generated.
+     * 2. should be "tenant/{tenantId}"= or {tenandId}= depending on whether the API has /tenant in the path
+     * 3. Each succeeding argument should be in the format "StringToBeReplaced"="replacementText".
      *    If you want to remove a string then it should be "StringToBeReplaced"=    with no replacmentText
      * @throws Exception
      */
@@ -28,15 +33,15 @@ public class SwaggerJsonConverter {
         ObjectMapper mapper = new ObjectMapper();
         String content = new Scanner(new File(args[0]+"/swagger.json")).useDelimiter("\\Z").next();
         ObjectNode root = (ObjectNode)mapper.readTree(content);
-        Map<String, JsonNode> temp = new HashMap();
+        Map<String, JsonNode> temp = new HashMap<>();
 
-        String newKey = null;
+        String newKey;
         boolean containsTenant;
         for (Iterator<Map.Entry<String, JsonNode>> it = root.get("paths").fields(); it.hasNext(); ) {
             Map.Entry<String, JsonNode> elt = it.next();
             newKey = elt.getKey();
             containsTenant = newKey.contains("tenant");
-            for(int i = 1; i < args.length; i++) {
+            for(int i = 2; i < args.length; i++) {
                 String[] splitValues = args[i].split(argDelimiter);
                 newKey = newKey.replace(splitValues[0], splitValues.length == 1? "" : splitValues[1]);
             }
@@ -69,5 +74,27 @@ public class SwaggerJsonConverter {
         root.set("paths", pathNode);
         mapper.writeValue(new java.io.File(args[0]+"/convertedOutput.json"), (JsonNode)root);
 
+        generateHtml(args, mapper, root);
+    }
+
+    private static void generateHtml(String[] args, ObjectMapper mapper, JsonNode root)
+        throws Exception {
+
+        // Configure the generator
+        ApiSource apiSource = new ApiSource();
+        apiSource.setOutputPath(args[0] + "/converted.html");
+        apiSource.setTemplatePath(args[1]);
+
+        // Clear out some configuration to reduce the work done by the generator
+        Info info = new Info();
+        apiSource.setHost("");
+        apiSource.setBasePath("");
+        apiSource.setInfo(info);
+        Log log = new SystemStreamLog();
+
+        // Invoke the generator used by the swagger maven plugin
+        HtmlGenerator htmlGenerator = new HtmlGenerator(apiSource, log, mapper.writeValueAsString(
+            root));
+        htmlGenerator.toDocuments();
     }
 }
