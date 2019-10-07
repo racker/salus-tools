@@ -19,9 +19,14 @@
 package main
 
 import (
-	"github.com/segmentio/kafka-go"
-	"fmt"
+	"bytes"
 	"context"
+	"fmt"
+	"github.com/satori/go.uuid"
+	"github.com/segmentio/kafka-go"
+	"io/ioutil"
+	"log"
+	"net/http"
 )
 
 const (
@@ -31,7 +36,32 @@ const (
 )
 
 func main() {
-r := kafka.NewReader(kafka.ReaderConfig{
+	id := uuid.NewV1()
+	privateZoneId := "privateZone" + id.String()
+	tenantId := "aaaaaa"
+
+	message := `{"name": "` + privateZoneId + `"}`
+
+
+	req, err := http.NewRequest("POST", "http://localhost:8080/v1.0/tenant/" + tenantId + "/zones", bytes.NewBuffer([]byte(message)))
+	if err != nil {
+		log.Fatalln(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-auth-token", "application/json")
+
+	// Do the request
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	fmt.Println("gbj resp " + resp.Status + string(body))
+	r := kafka.NewReader(kafka.ReaderConfig{
     Brokers:   []string{"localhost:9092"},
     Topic:     "telemetry.resources.json",
     MinBytes:  1, // 10KB
