@@ -24,9 +24,12 @@ import (
 	"fmt"
 	"github.com/satori/go.uuid"
 	"github.com/segmentio/kafka-go"
+	"html/template"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
+	"strings"
 )
 
 const (
@@ -36,11 +39,53 @@ const (
 )
 
 func main() {
-	id := uuid.NewV1()
-	privateZoneId := "privateZone" + id.String()
+	uuid := uuid.NewV4()
+	id := strings.Replace(uuid.String(), "-", "", -1)
+	privateZoneId := "privateZone" + id
+	resourceId := "resourceId" + id
 	tenantId := "aaaaaa"
 
 	message := `{"name": "` + privateZoneId + `"}`
+
+	localConfigTemplate := `resource_id: {{.ResourceId}}
+zone: {{.PrivateZoneID}}
+labels:
+  environment: localdev
+tls:
+  provided:
+    ca: certs/out/ca.pem
+    cert: certs/out/tenantA.pem
+    key: certs/out/tenantA-key.pem
+ambassador:
+  address: localhost:6565
+ingest:
+  lumberjack:
+    bind: localhost:5044
+  telegraf:
+    json:
+      bind: localhost:8094
+agents:
+  dataPath: data-telemetry-envoy
+`
+	type TemplateFields = struct {
+		ResourceId string
+		PrivateZoneID string
+	}
+
+	dir, err := ioutil.TempDir("", "e2et")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	f, err := os.Create(dir + "/config")
+	if err != nil {
+		log.Fatal(err)
+	}
+	tmpl, err := template.New("t1").Parse(localConfigTemplate)
+	if err != nil {
+		log.Fatal(err)
+	}
+	tmpl.Execute(f, TemplateFields{resourceId, privateZoneId})
 
 
 	req, err := http.NewRequest("POST", "http://localhost:8080/v1.0/tenant/" + tenantId + "/zones", bytes.NewBuffer([]byte(message)))
@@ -63,7 +108,7 @@ func main() {
 	fmt.Println("gbj resp " + resp.Status + string(body))
 	r := kafka.NewReader(kafka.ReaderConfig{
     Brokers:   []string{"localhost:9092"},
-    Topic:     "telemetry.resources.json",
+    Topic:     "salus.events.json",
     MinBytes:  1, // 10KB
     MaxBytes:  10e6, // 10MB
 })
