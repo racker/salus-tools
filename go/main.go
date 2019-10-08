@@ -29,6 +29,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"strings"
 )
 
@@ -41,10 +42,12 @@ const (
 func main() {
 	uuid := uuid.NewV4()
 	id := strings.Replace(uuid.String(), "-", "", -1)
-	privateZoneId := "privateZone" + id
-	resourceId := "resourceId" + id
+	// privateZoneId := "privateZone_" + id
+	privateZoneId := "dummy"
+	resourceId := "resourceId_" + id
 	tenantId := "aaaaaa"
 
+	certDir := "/Users/geor7956/incoming/s4/salus-telemetry-bundle/dev/certs"
 	message := `{"name": "` + privateZoneId + `"}`
 
 	localConfigTemplate := `resource_id: {{.ResourceId}}
@@ -53,9 +56,9 @@ labels:
   environment: localdev
 tls:
   provided:
-    ca: certs/out/ca.pem
-    cert: certs/out/tenantA.pem
-    key: certs/out/tenantA-key.pem
+    ca: {{.CertDir}}/out/ca.pem
+    cert: {{.CertDir}}/out/tenantA.pem
+    key: {{.CertDir}}/out/tenantA-key.pem
 ambassador:
   address: localhost:6565
 ingest:
@@ -70,6 +73,7 @@ agents:
 	type TemplateFields = struct {
 		ResourceId string
 		PrivateZoneID string
+		CertDir string
 	}
 
 	dir, err := ioutil.TempDir("", "e2et")
@@ -77,7 +81,8 @@ agents:
 		log.Fatal(err)
 	}
 
-	f, err := os.Create(dir + "/config")
+	configFileName := dir + "/config.yml"
+	f, err := os.Create(configFileName)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -85,8 +90,25 @@ agents:
 	if err != nil {
 		log.Fatal(err)
 	}
-	tmpl.Execute(f, TemplateFields{resourceId, privateZoneId})
+	tmpl.Execute(f, TemplateFields{resourceId, privateZoneId, certDir})
 
+	envoyExeDir := "/Users/geor7956/go/bin/"
+
+	cmd := exec.Command(envoyExeDir + "telemetry-envoy", "run", "--config=" + configFileName)
+	cmd.Dir	= dir
+	cmd.Stdout, err = os.Create(dir + "/envoyStdout")
+	if err != nil {
+		log.Fatal(err)
+	}
+	cmd.Stderr, err = os.Create(dir + "/envoyStderr")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = cmd.Start()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	req, err := http.NewRequest("POST", "http://localhost:8080/v1.0/tenant/" + tenantId + "/zones", bytes.NewBuffer([]byte(message)))
 	if err != nil {
