@@ -34,29 +34,29 @@ import (
 	"strings"
 )
 
-	type LabelsType = struct {
-		AgentDiscoveredArch string `json:"agent_discovered_arch"`
-		AgentDiscoveredOs string `json:"agent_discovered_os"`
-	}
-	type agentReleaseEntry = struct {
-		Id string
-		ArType string `json:"type"`
-		Version string
-		Labels LabelsType
-		Url string
-		Exe string
-	}
-	type agentReleaseType = struct {
-		Content []agentReleaseEntry
-	}
+type LabelsType = struct {
+	AgentDiscoveredArch string `json:"agent_discovered_arch"`
+	AgentDiscoveredOs   string `json:"agent_discovered_os"`
+}
+type agentReleaseEntry = struct {
+	Id      string
+	ArType  string `json:"type"`
+	Version string
+	Labels  LabelsType
+	Url     string
+	Exe     string
+}
+type agentReleaseType = struct {
+	Content []agentReleaseEntry
+}
 
-	type TemplateFields = struct {
-		ResourceId string
-		PrivateZoneID string
-		CertDir string
-	}
+type TemplateFields = struct {
+	ResourceId    string
+	PrivateZoneID string
+	CertDir       string
+}
 
-	var localConfigTemplate = `resource_id: {{.ResourceId}}
+var localConfigTemplate = `resource_id: {{.ResourceId}}
 zone: {{.PrivateZoneID}}
 labels:
   environment: localdev
@@ -77,19 +77,19 @@ agents:
   dataPath: data-telemetry-envoy
 `
 
-
 type config = struct {
-	currentUUID uuid.UUID
-	id string
-	privateZoneId string
-	resourceId string
-	tenantId string
-	publicApiUrl string
+	currentUUID     uuid.UUID
+	id              string
+	privateZoneId   string
+	resourceId      string
+	tenantId        string
+	publicApiUrl    string
 	agentReleaseUrl string
-	certDir string
-	regularToken string
-	dir string
+	certDir         string
+	regularToken    string
+	dir             string
 }
+
 func initConfig() config {
 	var c config
 	c.currentUUID = uuid.NewV4()
@@ -159,7 +159,7 @@ func main() {
 	r.Close()
 }
 
-func initEnvoy(c config)  {
+func initEnvoy(c config) {
 	configFileName := c.dir + "/config.yml"
 	f, err := os.Create(configFileName)
 	if err != nil {
@@ -187,7 +187,7 @@ func initEnvoy(c config)  {
 	}
 }
 
-func getReleases(c config) (*agentReleaseType) {
+func getReleases(c config) *agentReleaseType {
 	req, err := http.NewRequest("GET", c.agentReleaseUrl, nil)
 	if err != nil {
 		log.Fatalln(err)
