@@ -21,6 +21,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/satori/go.uuid"
 	"github.com/segmentio/kafka-go"
@@ -33,22 +34,62 @@ import (
 	"strings"
 )
 
-const (
-	version = "dev"
-	commit  = "none"
-	date    = "unknown"
-)
+
 
 func main() {
-	uuid := uuid.NewV4()
-	id := strings.Replace(uuid.String(), "-", "", -1)
+	currentUUID := uuid.NewV4()
+	id := strings.Replace(currentUUID.String(), "-", "", -1)
 	// privateZoneId := "privateZone_" + id
 	privateZoneId := "dummy"
 	resourceId := "resourceId_" + id
 	tenantId := "aaaaaa"
+	publicApiUrl := "http://localhost:8080/"
+	agentReleaseUrl := publicApiUrl + "v1.0/tenant/" + tenantId + "/agent-releases"
 
 	certDir := "/Users/geor7956/incoming/s4/salus-telemetry-bundle/dev/certs"
 	message := `{"name": "` + privateZoneId + `"}`
+
+
+	type LabelsType = struct {
+		AgentDiscoveredArch string `json:"agent_discovered_arch"`
+		AgentDiscoveredOs string `json:"agent_discovered_os"`
+	}
+	type agentReleaseEntry = struct {
+		Id string
+		ArType string `json:"type"`
+		Version string
+		Labels LabelsType
+		Url string
+		Exe string
+	}
+	type agentReleaseType = struct {
+		Content []agentReleaseEntry
+	}
+
+	regularToken := ""
+	req, err := http.NewRequest("GET", agentReleaseUrl, nil)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-auth-token", regularToken)
+
+	// Do the request
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Fatalln(err)
+	}
+//	body2 := []byte(`{"content":[{"id":"gbjid1","type":"TELEGRAF","version":"1.11.0","labels":{"agent_discovered_arch":"amd64","agent_discovered_os":"darwin"},"url":"https://homebrew.bintray.com/bottles/telegraf-1.11.0.high_sierra.bottle.tar.gz","exe":"telegraf/1.11.0/bin/telegraf","createdTimestamp":"2019-07-19T22:56:43Z","updatedTimestamp":"2019-07-19T22:56:43Z"},{"id":"7376d778-5f3f-43ee-8c21-2c79323481b0","type":"TELEGRAF","version":"1.11.0","labels":{"agent_discovered_arch":"amd64","agent_discovered_os":"linux"},"url":"https://dl.influxdata.com/telegraf/releases/telegraf-1.11.0-static_linux_amd64.tar.gz","exe":"./telegraf/telegraf","createdTimestamp":"2019-07-19T22:57:31Z","updatedTimestamp":"2019-07-19T22:57:31Z"}],"number":0,"totalPages":1,"totalElements":2,"last":true,"first":true}`)
+
+
+	//defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	ar := new(agentReleaseType)
+	err = json.Unmarshal(body, &ar)
+	if err != nil {
+		log.Fatalln(err)
+	}
 
 	localConfigTemplate := `resource_id: {{.ResourceId}}
 zone: {{.PrivateZoneID}}
@@ -110,7 +151,7 @@ agents:
 		log.Fatal(err)
 	}
 
-	req, err := http.NewRequest("POST", "http://localhost:8080/v1.0/tenant/" + tenantId + "/zones", bytes.NewBuffer([]byte(message)))
+	req, err = http.NewRequest("POST", "http://localhost:8080/v1.0/tenant/" + tenantId + "/zones", bytes.NewBuffer([]byte(message)))
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -118,15 +159,15 @@ agents:
 	req.Header.Set("x-auth-token", "application/json")
 
 	// Do the request
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	client = &http.Client{}
+	resp, err = client.Do(req)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
 
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err = ioutil.ReadAll(resp.Body)
 	fmt.Println("gbj resp " + resp.Status + string(body))
 	r := kafka.NewReader(kafka.ReaderConfig{
     Brokers:   []string{"localhost:9092"},
