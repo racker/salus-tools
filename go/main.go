@@ -106,32 +106,14 @@ func initConfig() config {
 
 func main() {
 	c := initConfig()
-	req, err := http.NewRequest("GET", c.agentReleaseUrl, nil)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("x-auth-token", c.regularToken)
-
-	// Do the request
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	//defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	ar := new(agentReleaseType)
-	err = json.Unmarshal(body, &ar)
-	if err != nil {
-		log.Fatalln(err)
-	}
+	ar := getReleases(c)
 	fmt.Println("gbjcontent: " + ar.Content[0].Id)
+
 	dir, err := ioutil.TempDir("", "e2et")
 	if err != nil {
 		log.Fatal(err)
 	}
-
+	fmt.Println("gbjdir: " + dir)
 	configFileName := dir + "/config.yml"
 	f, err := os.Create(configFileName)
 	if err != nil {
@@ -145,8 +127,8 @@ func main() {
 
 	envoyExeDir := "/Users/geor7956/go/bin/"
 
-	cmd := exec.Command(envoyExeDir + "telemetry-envoy", "run", "--config=" + configFileName)
-	cmd.Dir	= dir
+	cmd := exec.Command(envoyExeDir+"telemetry-envoy", "run", "--config="+configFileName)
+	cmd.Dir = dir
 	cmd.Stdout, err = os.Create(dir + "/envoyStdout")
 	if err != nil {
 		log.Fatal(err)
@@ -162,7 +144,7 @@ func main() {
 	}
 
 	message := `{"name": "` + c.privateZoneId + `"}`
-	req, err = http.NewRequest("POST", "http://localhost:8080/v1.0/tenant/" + c.tenantId + "/zones", bytes.NewBuffer([]byte(message)))
+	req, err := http.NewRequest("POST", "http://localhost:8080/v1.0/tenant/"+c.tenantId+"/zones", bytes.NewBuffer([]byte(message)))
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -170,31 +152,53 @@ func main() {
 	req.Header.Set("x-auth-token", "application/json")
 
 	// Do the request
-	client = &http.Client{}
-	resp, err = client.Do(req)
+	client := &http.Client{}
+	resp, err := client.Do(req)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-
 	defer resp.Body.Close()
-	body, err = ioutil.ReadAll(resp.Body)
+	body, err := ioutil.ReadAll(resp.Body)
 	fmt.Println("gbj resp " + resp.Status + string(body))
 	r := kafka.NewReader(kafka.ReaderConfig{
-    Brokers:   []string{"localhost:9092"},
-    Topic:     "salus.events.json",
-    MinBytes:  1, // 10KB
-    MaxBytes:  10e6, // 10MB
-})
+		Brokers:  []string{"localhost:9092"},
+		Topic:    "salus.events.json",
+		MinBytes: 1,    // 10KB
+		MaxBytes: 10e6, // 10MB
+	})
 
-for {
-    m, err := r.ReadMessage(context.Background())
-    if err != nil {
-        break
-    }
-	fmt.Printf("message at topic/partition/offset %v/%v/%v: %s = %s\n", m.Topic, m.Partition, m.Offset, string(m.Key), string(m.Value))
-	break
+	for {
+		m, err := r.ReadMessage(context.Background())
+		if err != nil {
+			break
+		}
+		fmt.Printf("message at topic/partition/offset %v/%v/%v: %s = %s\n", m.Topic, m.Partition, m.Offset, string(m.Key), string(m.Value))
+		break
+	}
+
+	r.Close()
 }
 
-r.Close()
+func getReleases(c config) (*agentReleaseType) {
+	req, err := http.NewRequest("GET", c.agentReleaseUrl, nil)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-auth-token", c.regularToken)
+	// Do the request
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	ar := new(agentReleaseType)
+	err = json.Unmarshal(body, ar)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	return ar
 }
