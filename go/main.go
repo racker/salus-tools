@@ -88,6 +88,7 @@ type config = struct {
 	agentReleaseUrl string
 	certDir string
 	regularToken string
+	dir string
 }
 func initConfig() config {
 	var c config
@@ -101,7 +102,16 @@ func initConfig() config {
 	c.agentReleaseUrl = c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/agent-releases"
 	c.certDir = "/Users/geor7956/incoming/s4/salus-telemetry-bundle/dev/certs"
 	c.regularToken = ""
+	dir, err := ioutil.TempDir("", "e2et")
+	checkErr(err, "error creating temp dir")
+	c.dir = dir
 	return c
+}
+
+func checkErr(err error, message string) {
+	if err != nil {
+		log.Fatal(message + ":" + err.Error())
+	}
 }
 
 func main() {
@@ -109,39 +119,8 @@ func main() {
 	ar := getReleases(c)
 	fmt.Println("gbjcontent: " + ar.Content[0].Id)
 
-	dir, err := ioutil.TempDir("", "e2et")
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println("gbjdir: " + dir)
-	configFileName := dir + "/config.yml"
-	f, err := os.Create(configFileName)
-	if err != nil {
-		log.Fatal(err)
-	}
-	tmpl, err := template.New("t1").Parse(localConfigTemplate)
-	if err != nil {
-		log.Fatal(err)
-	}
-	tmpl.Execute(f, TemplateFields{c.resourceId, c.privateZoneId, c.certDir})
-
-	envoyExeDir := "/Users/geor7956/go/bin/"
-
-	cmd := exec.Command(envoyExeDir+"telemetry-envoy", "run", "--config="+configFileName)
-	cmd.Dir = dir
-	cmd.Stdout, err = os.Create(dir + "/envoyStdout")
-	if err != nil {
-		log.Fatal(err)
-	}
-	cmd.Stderr, err = os.Create(dir + "/envoyStderr")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = cmd.Start()
-	if err != nil {
-		log.Fatal(err)
-	}
+	fmt.Println("gbjdir: " + c.dir)
+	initEnvoy(c)
 
 	message := `{"name": "` + c.privateZoneId + `"}`
 	req, err := http.NewRequest("POST", "http://localhost:8080/v1.0/tenant/"+c.tenantId+"/zones", bytes.NewBuffer([]byte(message)))
@@ -178,6 +157,34 @@ func main() {
 	}
 
 	r.Close()
+}
+
+func initEnvoy(c config)  {
+	configFileName := c.dir + "/config.yml"
+	f, err := os.Create(configFileName)
+	if err != nil {
+		log.Fatal(err)
+	}
+	tmpl, err := template.New("t1").Parse(localConfigTemplate)
+	if err != nil {
+		log.Fatal(err)
+	}
+	tmpl.Execute(f, TemplateFields{c.resourceId, c.privateZoneId, c.certDir})
+	envoyExeDir := "/Users/geor7956/go/bin/"
+	cmd := exec.Command(envoyExeDir+"telemetry-envoy", "run", "--config="+configFileName)
+	cmd.Dir = c.dir
+	cmd.Stdout, err = os.Create(c.dir + "/envoyStdout")
+	if err != nil {
+		log.Fatal(err)
+	}
+	cmd.Stderr, err = os.Create(c.dir + "/envoyStderr")
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = cmd.Start()
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func getReleases(c config) (*agentReleaseType) {
