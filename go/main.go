@@ -34,22 +34,6 @@ import (
 	"strings"
 )
 
-
-
-func main() {
-	currentUUID := uuid.NewV4()
-	id := strings.Replace(currentUUID.String(), "-", "", -1)
-	// privateZoneId := "privateZone_" + id
-	privateZoneId := "dummy"
-	resourceId := "resourceId_" + id
-	tenantId := "aaaaaa"
-	publicApiUrl := "http://localhost:8080/"
-	agentReleaseUrl := publicApiUrl + "v1.0/tenant/" + tenantId + "/agent-releases"
-
-	certDir := "/Users/geor7956/incoming/s4/salus-telemetry-bundle/dev/certs"
-	message := `{"name": "` + privateZoneId + `"}`
-
-
 	type LabelsType = struct {
 		AgentDiscoveredArch string `json:"agent_discovered_arch"`
 		AgentDiscoveredOs string `json:"agent_discovered_os"`
@@ -66,32 +50,13 @@ func main() {
 		Content []agentReleaseEntry
 	}
 
-	regularToken := ""
-	req, err := http.NewRequest("GET", agentReleaseUrl, nil)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("x-auth-token", regularToken)
-
-	// Do the request
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		log.Fatalln(err)
-	}
-//	body2 := []byte(`{"content":[{"id":"gbjid1","type":"TELEGRAF","version":"1.11.0","labels":{"agent_discovered_arch":"amd64","agent_discovered_os":"darwin"},"url":"https://homebrew.bintray.com/bottles/telegraf-1.11.0.high_sierra.bottle.tar.gz","exe":"telegraf/1.11.0/bin/telegraf","createdTimestamp":"2019-07-19T22:56:43Z","updatedTimestamp":"2019-07-19T22:56:43Z"},{"id":"7376d778-5f3f-43ee-8c21-2c79323481b0","type":"TELEGRAF","version":"1.11.0","labels":{"agent_discovered_arch":"amd64","agent_discovered_os":"linux"},"url":"https://dl.influxdata.com/telegraf/releases/telegraf-1.11.0-static_linux_amd64.tar.gz","exe":"./telegraf/telegraf","createdTimestamp":"2019-07-19T22:57:31Z","updatedTimestamp":"2019-07-19T22:57:31Z"}],"number":0,"totalPages":1,"totalElements":2,"last":true,"first":true}`)
-
-
-	//defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	ar := new(agentReleaseType)
-	err = json.Unmarshal(body, &ar)
-	if err != nil {
-		log.Fatalln(err)
+	type TemplateFields = struct {
+		ResourceId string
+		PrivateZoneID string
+		CertDir string
 	}
 
-	localConfigTemplate := `resource_id: {{.ResourceId}}
+	var localConfigTemplate = `resource_id: {{.ResourceId}}
 zone: {{.PrivateZoneID}}
 labels:
   environment: localdev
@@ -111,12 +76,46 @@ ingest:
 agents:
   dataPath: data-telemetry-envoy
 `
-	type TemplateFields = struct {
-		ResourceId string
-		PrivateZoneID string
-		CertDir string
-	}
 
+
+func main() {
+	currentUUID := uuid.NewV4()
+	id := strings.Replace(currentUUID.String(), "-", "", -1)
+	// privateZoneId := "privateZone_" + id
+	privateZoneId := "dummy"
+	resourceId := "resourceId_" + id
+	tenantId := "aaaaaa"
+	publicApiUrl := "http://localhost:8080/"
+	agentReleaseUrl := publicApiUrl + "v1.0/tenant/" + tenantId + "/agent-releases"
+
+	certDir := "/Users/geor7956/incoming/s4/salus-telemetry-bundle/dev/certs"
+	message := `{"name": "` + privateZoneId + `"}`
+
+
+	regularToken := ""
+
+
+	req, err := http.NewRequest("GET", agentReleaseUrl, nil)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-auth-token", regularToken)
+
+	// Do the request
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	//defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	ar := new(agentReleaseType)
+	err = json.Unmarshal(body, &ar)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	fmt.Println("gbjcontent: " + ar.Content[0].Id)
 	dir, err := ioutil.TempDir("", "e2et")
 	if err != nil {
 		log.Fatal(err)
@@ -181,7 +180,8 @@ for {
     if err != nil {
         break
     }
-    fmt.Printf("message at topic/partition/offset %v/%v/%v: %s = %s\n", m.Topic, m.Partition, m.Offset, string(m.Key), string(m.Value))
+	fmt.Printf("message at topic/partition/offset %v/%v/%v: %s = %s\n", m.Topic, m.Partition, m.Offset, string(m.Key), string(m.Value))
+	break
 }
 
 r.Close()
