@@ -78,29 +78,40 @@ agents:
 `
 
 
+type config = struct {
+	currentUUID uuid.UUID
+	id string
+	privateZoneId string
+	resourceId string
+	tenantId string
+	publicApiUrl string
+	agentReleaseUrl string
+	certDir string
+	regularToken string
+}
+func initConfig() config {
+	var c config
+	c.currentUUID = uuid.NewV4()
+	c.id = strings.Replace(c.currentUUID.String(), "-", "", -1)
+	// privateZoneId = "privateZone_" + id
+	c.privateZoneId = "dummy"
+	c.resourceId = "resourceId_" + c.id
+	c.tenantId = "aaaaaa"
+	c.publicApiUrl = "http://localhost:8080/"
+	c.agentReleaseUrl = c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/agent-releases"
+	c.certDir = "/Users/geor7956/incoming/s4/salus-telemetry-bundle/dev/certs"
+	c.regularToken = ""
+	return c
+}
+
 func main() {
-	currentUUID := uuid.NewV4()
-	id := strings.Replace(currentUUID.String(), "-", "", -1)
-	// privateZoneId := "privateZone_" + id
-	privateZoneId := "dummy"
-	resourceId := "resourceId_" + id
-	tenantId := "aaaaaa"
-	publicApiUrl := "http://localhost:8080/"
-	agentReleaseUrl := publicApiUrl + "v1.0/tenant/" + tenantId + "/agent-releases"
-
-	certDir := "/Users/geor7956/incoming/s4/salus-telemetry-bundle/dev/certs"
-	message := `{"name": "` + privateZoneId + `"}`
-
-
-	regularToken := ""
-
-
-	req, err := http.NewRequest("GET", agentReleaseUrl, nil)
+	c := initConfig()
+	req, err := http.NewRequest("GET", c.agentReleaseUrl, nil)
 	if err != nil {
 		log.Fatalln(err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("x-auth-token", regularToken)
+	req.Header.Set("x-auth-token", c.regularToken)
 
 	// Do the request
 	client := &http.Client{}
@@ -130,7 +141,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	tmpl.Execute(f, TemplateFields{resourceId, privateZoneId, certDir})
+	tmpl.Execute(f, TemplateFields{c.resourceId, c.privateZoneId, c.certDir})
 
 	envoyExeDir := "/Users/geor7956/go/bin/"
 
@@ -150,7 +161,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	req, err = http.NewRequest("POST", "http://localhost:8080/v1.0/tenant/" + tenantId + "/zones", bytes.NewBuffer([]byte(message)))
+	message := `{"name": "` + c.privateZoneId + `"}`
+	req, err = http.NewRequest("POST", "http://localhost:8080/v1.0/tenant/" + c.tenantId + "/zones", bytes.NewBuffer([]byte(message)))
 	if err != nil {
 		log.Fatalln(err)
 	}
