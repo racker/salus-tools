@@ -93,6 +93,9 @@ type config = struct {
 	regularToken    string
 	adminToken		string
 	dir             string
+	kafkaBroker     string
+	topic           string
+	port            string
 }
 
 func initConfig() config {
@@ -112,6 +115,10 @@ func initConfig() config {
 	dir, err := ioutil.TempDir("", "e2et")
 	checkErr(err, "error creating temp dir")
 	c.dir = dir
+	c.kafkaBroker = "localhost:9092"
+	c.topic = "salus.events.json"
+	//gbj pick port dynamically
+	c.port = "8222"
 	return c
 }
 
@@ -134,27 +141,14 @@ func main() {
 	
 	initEnvoy(c, releaseId)
 	createTask(c)
-
-	r := kafka.NewReader(kafka.ReaderConfig{
-		Brokers:  []string{"localhost:9092"},
-		Topic:    "salus.events.json",
-		MinBytes: 1,    // 10KB
-		MaxBytes: 10e6, // 10MB
-	})
-
-	for {
-		m, err := r.ReadMessage(context.Background())
-		if err != nil {
-			break
-		}
-		fmt.Printf("message at topic/partition/offset %v/%v/%v: %s = %s\n", m.Topic, m.Partition, m.Offset, string(m.Key), string(m.Value))
-		break
-	}
-
-	r.Close()
+	eventFound := make(chan bool, 1)
+	go checkForEvents(c, eventFound)
+	createMonitor(c)
+	<-eventFound
 }
 
 func initEnvoy(c config, releaseId string) {
+	log.Println("starting envoy")
 	configFileName := c.dir + "/config.yml"
 	f, err := os.Create(configFileName)
 	if err != nil {
@@ -198,7 +192,7 @@ func initEnvoy(c config, releaseId string) {
 	if _, err = os.Stat(c.dir + "/data-telemetry-envoy"); err != nil {
 		log.Fatal("install failed")
 	}
-	
+	log.Println("envoy started")
 }
 var linuxReleaseData =
 	`{
@@ -527,4 +521,52 @@ func createTask(c config) {
 	data := fmt.Sprintf(taskData, "task_" + c.id, runtime.GOOS)
 	_ = doReq("POST", url, data, "creating private zone", c.regularToken)
 	
+}
+
+func checkForEvents(c config, eventFound chan bool) {
+	r := kafka.NewReader(kafka.ReaderConfig{
+		Brokers:  []string{c.kafkaBroker},
+		Topic:    c.topic,
+		MinBytes: 1,    // 10KB
+		MaxBytes: 10e6, // 10MB
+	})
+
+	for {
+		m, err := r.ReadMessage(context.Background())
+		if err != nil {
+			break
+		}
+		log.Printf("message at topic/partition/offset %v/%v/%v: %s = %s\n", m.Topic, m.Partition, m.Offset, string(m.Key), string(m.Value))
+		s := string(m.Value)
+		if strings.Contains(s, c.resourceId) {
+			eventFound <- true
+		}
+	}
+
+	r.Close()
+	
+}
+
+var monitorData =
+	`{
+  "labelSelector": {
+    "agent_discovered_os": "%s"
+  },
+  "interval": "PT30S",
+  "details": {
+    "type": "remote",
+    "monitoringZones": ["%s"],
+    "plugin": {
+      "type": "net_response",
+      "address": "localhost:%s",
+      "protocol": "tcp"
+    }
+  }
+}`
+func createMonitor(c config ) {
+	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/monitors/"
+	data := fmt.Sprintf(monitorData, runtime.GOOS, c.privateZoneId, c.port)
+	_ = doReq("POST", url, data, "creating monitor", c.regularToken)
+	log.Println("monitor created")
+
 }
