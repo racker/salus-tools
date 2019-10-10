@@ -237,26 +237,11 @@ func getReleases(c config) string {
 	releaseData["linux-amd64"] = linuxReleaseData
 	releaseData["darwin-amd64"] = darwinReleaseData
 
-	req, err := http.NewRequest("GET", c.agentReleaseUrl, nil)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("x-auth-token", c.regularToken)
-	// Do the request
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	ar := new(agentReleaseType)
-	err = json.Unmarshal(body, ar)
-	if err != nil {
-		log.Fatalln(err)
-	}
-
+	var ar agentReleaseType
+	arBody := doReq("GET", c.agentReleaseUrl, "", "getting all agent releases",
+		c.regularToken)
+	err := json.Unmarshal(arBody, &ar)
+	checkErr(err, "unable to parse agent release response")
 	// get the latest matching release
 	var entry agentReleaseEntry
 	entry.Version = "0.0.0"
@@ -280,8 +265,8 @@ func getReleases(c config) string {
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("x-auth-token", c.adminToken)
 		// Do the request
-		client = &http.Client{}
-		resp, err = client.Do(req)
+		client := &http.Client{}
+		resp, err := client.Do(req)
 		checkErr(err, "unable to create release")
 		if resp.StatusCode != 200 {
 			log.Fatal("unable to create release")
@@ -296,4 +281,22 @@ func getReleases(c config) string {
 			return entry.Id
 	}
 	
+}
+
+func doReq(method string, url string, data string, errMessage string, token string) ([]byte){
+		req, err := http.NewRequest(method, url, bytes.NewBuffer([]byte(data)))
+		checkErr(err, "request create failed: " + errMessage)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("x-auth-token", token)
+		// Do the request
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		checkErr(err, "client create failed: " + errMessage)
+		if resp.StatusCode != 200 {
+			log.Fatal(errMessage + ": status code: " + resp.Status)
+		}
+		defer resp.Body.Close()
+		body, err := ioutil.ReadAll(resp.Body)
+		checkErr(err, "unable read response body: " + errMessage)
+		return body
 }
