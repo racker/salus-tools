@@ -20,7 +20,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/coreos/go-semver/semver"
@@ -35,6 +34,7 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+	"context"
 )
 
 type LabelsType = struct {
@@ -57,6 +57,7 @@ type TemplateFields = struct {
 	ResourceId    string
 	PrivateZoneID string
 	CertDir       string
+	ApiKey        string
 }
 
 var localConfigTemplate = `resource_id: {{.ResourceId}}
@@ -79,7 +80,22 @@ ingest:
 agents:
   dataPath: data-telemetry-envoy
 `
-
+var remoteConfigTemplate =
+	`resource_id: "{{.ResourceId }}"
+zone: {{.PrivateZoneID}}
+tls:
+  auth_service:
+    url: https://salus-auth-serv.dev.monplat.rackspace.net
+    token_provider: keystone_v2
+  token_providers:
+    keystone_v2:
+      username: "gjahad"
+      apikey: "{{.ApiKey}}"
+ambassador:
+  address: salus-ambassador.dev.monplat.rackspace.net:443
+agents:
+  dataPath: data-telemetry-envoy
+`
 type config = struct {
 	currentUUID     uuid.UUID
 	id              string
@@ -105,13 +121,14 @@ func initConfig() config {
 	c.privateZoneId = "privateZone_" + c.id
 	//c.privateZoneId = "dummy"
 	c.resourceId = "resourceId_" + c.id
-	c.tenantId = "aaaaaa"
-	c.publicApiUrl = "http://localhost:8080/"
+	c.tenantId = "923886"
+	c.publicApiUrl = "http://salus-api.dev.monplat.rackspace.net/"
 	c.adminApiUrl = "http://localhost:8888"
 	c.agentReleaseUrl = c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/agent-releases"
 	c.certDir = "/Users/geor7956/incoming/s4/salus-telemetry-bundle/dev/certs"
-	c.regularToken = ""
-	c.adminApiUrl = ""
+	c.regularToken = "AAAZNyC9aBT55WH_LPDJbYSPEraSPKrETjmrojv4jQzUzAlMaHawBn3WGYPWh_U267H46RMyotSY3ZrysFxh98JOYj-9X9Gfr7MxxADMJvUMZhC-FBxBuuRH1pyIIiHrWuykv3x5HL5yfw"
+	c.adminToken = "AAAZNyC9E9huap7JZNPXpxjXUf0rR2k__pjcYqFdiRx5-JW-0blyKOROgE8ly2ZerQ3xttiwRxC6bWNZzS_U-oJtTA6V-2HPzj8cUxPcZys8KZe1ytAWauto"
+	c.adminApiUrl = "http://salus-api-admin.dev.monplat.rackspace.net"
 	dir, err := ioutil.TempDir("", "e2et")
 	checkErr(err, "error creating temp dir")
 	c.dir = dir
@@ -154,11 +171,11 @@ func initEnvoy(c config, releaseId string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	tmpl, err := template.New("t1").Parse(localConfigTemplate)
+	tmpl, err := template.New("t1").Parse(remoteConfigTemplate)
 	if err != nil {
 		log.Fatal(err)
 	}
-	tmpl.Execute(f, TemplateFields{c.resourceId, c.privateZoneId, c.certDir})
+	tmpl.Execute(f, TemplateFields{c.resourceId, c.privateZoneId, c.certDir, os.Getenv("GBJ_API_KEY")})
 	envoyExeDir := "/Users/geor7956/go/bin/"
 	cmd := exec.Command(envoyExeDir+"telemetry-envoy", "run", "--config="+configFileName)
 	cmd.Dir = c.dir
@@ -253,7 +270,7 @@ func getReleases(c config) string {
 		}
 	}
 	//create release if none exists
-	if entry.Version == "" {
+	if entry.Version == "0.0.0" {
 		releaseBody, ok := releaseData[runtime.GOOS + "-" + runtime.GOARCH]
 		if !ok {
 			log.Fatal("no valid release found for this arch")
@@ -325,7 +342,7 @@ type GetAgentInstallsResp struct {
 		checkErr(err, "unable to parse get agent installs response")
 		for _, i := range resp.Content {
 			// delete each install
-			_ = doReq("DELETE", url + i.ID, "", "deleting agent install" + i.ID, c.regularToken)
+			_ = doReq("DELETE", url + i.ID, "", "deleting agent install " + i.ID, c.regularToken)
 
 		}
 	}
@@ -361,7 +378,7 @@ func deleteResources(c config) {
 	checkErr(err, "unable to parse get resources response")
 	for _, i := range resp.Content {
 		// delete each resource
-		_ = doReq("DELETE", url + i.ResourceID, "", "deleting resource" + i.ResourceID, c.regularToken)
+		_ = doReq("DELETE", url + i.ResourceID, "", "deleting resource " + i.ResourceID, c.regularToken)
 
 	}
 }
@@ -414,7 +431,7 @@ func deleteMonitors(c config) {
 		checkErr(err, "unable to parse get monitors response")
 		for _, i := range resp.Content {
 			// delete each monitor
-			_ = doReq("DELETE", url + i.ID, "", "deleting zone" + i.ID, c.regularToken)
+			_ = doReq("DELETE", url + i.ID, "", "deleting monitor " + i.ID, c.regularToken)
 
 		}
 		if resp.Last {
@@ -433,8 +450,9 @@ func createPrivateZone(c config) {
 		checkErr(err, "unable to parse get zones response")
 		for _, i := range resp.Content {
 			// delete each zone
-			_ = doReq("DELETE", url + i.Name, "", "deleting zone" + i.Name, c.regularToken)
-
+			if strings.Index(i.Name, "public/") != 0 {
+				_ = doReq("DELETE", url + i.Name, "", "deleting zone " + i.Name, c.regularToken)
+			}
 		}
 		if resp.Last {
 			break
@@ -509,7 +527,7 @@ func createTask(c config) {
 		checkErr(err, "unable to parse get tasks response")
 		for _, i := range resp.Content {
 			// delete each task
-			_ = doReq("DELETE", url + i.ID, "", "deleting tasks" + i.ID, c.regularToken)
+			_ = doReq("DELETE", url + i.ID, "", "deleting tasks " + i.ID, c.regularToken)
 
 		}
 		if resp.Last {
