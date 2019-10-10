@@ -99,8 +99,8 @@ func initConfig() config {
 	var c config
 	c.currentUUID = uuid.NewV4()
 	c.id = strings.Replace(c.currentUUID.String(), "-", "", -1)
-	// privateZoneId = "privateZone_" + id
-	c.privateZoneId = "dummy"
+	c.privateZoneId = "privateZone_" + c.id
+	//c.privateZoneId = "dummy"
 	c.resourceId = "resourceId_" + c.id
 	c.tenantId = "aaaaaa"
 	c.publicApiUrl = "http://localhost:8080/"
@@ -128,28 +128,13 @@ func main() {
 	releaseId := getReleases(c)
 	fmt.Println("gbjr: " + releaseId)
 	deleteAgentInstalls(c)
+	deleteResources(c)
+	deleteMonitors(c)
+	createPrivateZone(c)
 
 
 	initEnvoy(c)
 
-	message := `{"name": "` + c.privateZoneId + `"}`
-	req, err := http.NewRequest("POST", "http://localhost:8080/v1.0/tenant/"+c.tenantId+"/zones", bytes.NewBuffer([]byte(message)))
-	if err != nil {
-		log.Fatalln(err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("x-auth-token", "application/json")
-
-	// Do the request
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	fmt.Println("gbj resp " + resp.Status + string(body))
 	r := kafka.NewReader(kafka.ReaderConfig{
 		Brokers:  []string{"localhost:9092"},
 		Topic:    "salus.events.json",
@@ -331,3 +316,120 @@ type GetAgentInstallsResp struct {
 
 		}
 	}
+
+type GetResourcesResp struct {
+	Content []struct {
+		TenantID   string `json:"tenantId"`
+		ResourceID string `json:"resourceId"`
+		Labels     struct {
+			AgentDiscoveredArch     string `json:"agent_discovered_arch"`
+			AgentDiscoveredHostname string `json:"agent_discovered_hostname"`
+			AgentEnvironment        string `json:"agent_environment"`
+			AgentDiscoveredOs       string `json:"agent_discovered_os"`
+		} `json:"labels"`
+		Metadata                  interface{} `json:"metadata"`
+		PresenceMonitoringEnabled bool        `json:"presenceMonitoringEnabled"`
+		AssociatedWithEnvoy       bool        `json:"associatedWithEnvoy"`
+		CreatedTimestamp          time.Time   `json:"createdTimestamp"`
+		UpdatedTimestamp          time.Time   `json:"updatedTimestamp"`
+	} `json:"content"`
+	Number        int  `json:"number"`
+	TotalPages    int  `json:"totalPages"`
+	TotalElements int  `json:"totalElements"`
+	Last          bool `json:"last"`
+	First         bool `json:"first"`
+}
+func deleteResources(c config) {
+	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/resources/"
+	body := doReq("GET", url,
+		"", "getting all resources", c.regularToken)
+	var resp GetResourcesResp
+	err := json.Unmarshal(body, &resp)
+	checkErr(err, "unable to parse get resources response")
+	for _, i := range resp.Content {
+		// delete each install
+		_ = doReq("DELETE", url + i.ResourceID, "", "deleting resource" + i.ResourceID, c.regularToken)
+
+	}
+}
+
+
+type GetZonesResp struct {
+	Content []struct {
+		Name              string        `json:"name"`
+		PollerTimeout     int           `json:"pollerTimeout"`
+		Provider          interface{}   `json:"provider"`
+		ProviderRegion    interface{}   `json:"providerRegion"`
+		SourceIPAddresses []interface{} `json:"sourceIpAddresses"`
+		CreatedTimestamp  time.Time     `json:"createdTimestamp"`
+		UpdatedTimestamp  time.Time     `json:"updatedTimestamp"`
+		Public            bool          `json:"public"`
+	} `json:"content"`
+	Number        int  `json:"number"`
+	TotalPages    int  `json:"totalPages"`
+	TotalElements int  `json:"totalElements"`
+	Last          bool `json:"last"`
+	First         bool `json:"first"`
+}
+type GetMonitorsResp struct {
+	Content []struct {
+		ID            string      `json:"id"`
+		Name          interface{} `json:"name"`
+		LabelSelector struct {
+			AgentDiscoveredOs string `json:"agent_discovered_os"`
+		} `json:"labelSelector"`
+		LabelSelectorMethod string      `json:"labelSelectorMethod"`
+		ResourceID          interface{} `json:"resourceId"`
+		Interval            string      `json:"interval"`
+		CreatedTimestamp time.Time `json:"createdTimestamp"`
+		UpdatedTimestamp time.Time `json:"updatedTimestamp"`
+	} `json:"content"`
+	Number        int  `json:"number"`
+	TotalPages    int  `json:"totalPages"`
+	TotalElements int  `json:"totalElements"`
+	Last          bool `json:"last"`
+	First         bool `json:"first"`
+}
+
+func deleteMonitors(c config) {
+	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/monitors/"
+	for {
+		body := doReq("GET", url,
+			"", "getting all monitors", c.regularToken)
+		var resp GetMonitorsResp
+		err := json.Unmarshal(body, &resp)
+		checkErr(err, "unable to parse get monitors response")
+		for _, i := range resp.Content {
+			// delete each install
+			_ = doReq("DELETE", url + i.ID, "", "deleting zone" + i.ID, c.regularToken)
+
+		}
+		if resp.Last {
+			break
+		}
+	}
+}
+
+func createPrivateZone(c config) {
+	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/zones/"
+	for {
+		body := doReq("GET", url,
+			"", "getting all zones", c.regularToken)
+		var resp GetZonesResp
+		err := json.Unmarshal(body, &resp)
+		checkErr(err, "unable to parse get zones response")
+		for _, i := range resp.Content {
+			// delete each install
+			_ = doReq("DELETE", url + i.Name, "", "deleting zone" + i.Name, c.regularToken)
+
+		}
+		if resp.Last {
+			break
+		}
+	}
+
+	// Now create new one
+	message := `{"name": "` + c.privateZoneId + `"}`
+	_ = doReq("POST", url, message, "creating private zone", c.regularToken)
+	
+}
