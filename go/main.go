@@ -131,9 +131,9 @@ func main() {
 	deleteResources(c)
 	deleteMonitors(c)
 	createPrivateZone(c)
-
-
-	initEnvoy(c)
+	
+	initEnvoy(c, releaseId)
+	createTask(c)
 
 	r := kafka.NewReader(kafka.ReaderConfig{
 		Brokers:  []string{"localhost:9092"},
@@ -154,7 +154,7 @@ func main() {
 	r.Close()
 }
 
-func initEnvoy(c config) {
+func initEnvoy(c config, releaseId string) {
 	configFileName := c.dir + "/config.yml"
 	f, err := os.Create(configFileName)
 	if err != nil {
@@ -180,6 +180,25 @@ func initEnvoy(c config) {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	// give it time to start
+	time.Sleep(10 * time.Second)
+	if _, err = os.Stat(c.dir + "/data-telemetry-envoy"); err == nil {
+		log.Fatal("installs incorrectly removed")
+	}
+	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/agent-installs"
+	installData := `{
+	"agentReleaseId": "%s",
+	"labelSelector": {
+		"agent_discovered_os": "%s"
+	}}`
+	_ = doReq("POST", url, fmt.Sprintf(installData, releaseId, runtime.GOOS), "creating agent install", c.regularToken)
+	// give it time to install
+	time.Sleep(10 * time.Second)
+	if _, err = os.Stat(c.dir + "/data-telemetry-envoy"); err != nil {
+		log.Fatal("install failed")
+	}
+	
 }
 var linuxReleaseData =
 	`{
@@ -347,7 +366,7 @@ func deleteResources(c config) {
 	err := json.Unmarshal(body, &resp)
 	checkErr(err, "unable to parse get resources response")
 	for _, i := range resp.Content {
-		// delete each install
+		// delete each resource
 		_ = doReq("DELETE", url + i.ResourceID, "", "deleting resource" + i.ResourceID, c.regularToken)
 
 	}
@@ -400,7 +419,7 @@ func deleteMonitors(c config) {
 		err := json.Unmarshal(body, &resp)
 		checkErr(err, "unable to parse get monitors response")
 		for _, i := range resp.Content {
-			// delete each install
+			// delete each monitor
 			_ = doReq("DELETE", url + i.ID, "", "deleting zone" + i.ID, c.regularToken)
 
 		}
@@ -419,7 +438,7 @@ func createPrivateZone(c config) {
 		err := json.Unmarshal(body, &resp)
 		checkErr(err, "unable to parse get zones response")
 		for _, i := range resp.Content {
-			// delete each install
+			// delete each zone
 			_ = doReq("DELETE", url + i.Name, "", "deleting zone" + i.Name, c.regularToken)
 
 		}
@@ -431,5 +450,81 @@ func createPrivateZone(c config) {
 	// Now create new one
 	message := `{"name": "` + c.privateZoneId + `"}`
 	_ = doReq("POST", url, message, "creating private zone", c.regularToken)
+	
+}
+
+var taskData =
+	`{
+	"name": "%s",
+	"measurement": "net_response",
+	"taskParameters": {
+		"labelSelector": {
+			"agent_discovered_os": "%s"
+		},
+		"critical": {
+			"consecutiveCount": 1,
+			"expression": {
+				"field": "result_code",
+				"threshold": 0.0,
+				"comparator": ">"
+			}
+		}
+	}
+}`
+
+type GetTasksResp struct {
+	Content []struct {
+		ID             string `json:"id"`
+		Name           string `json:"name"`
+		Measurement    string `json:"measurement"`
+		TaskParameters struct {
+			Info     interface{} `json:"info"`
+			Warning  interface{} `json:"warning"`
+			Critical struct {
+				Expression struct {
+					Field      string `json:"field"`
+					Threshold  int    `json:"threshold"`
+					Comparator string `json:"comparator"`
+				} `json:"expression"`
+				ConsecutiveCount int `json:"consecutiveCount"`
+			} `json:"critical"`
+			EvalExpressions   interface{} `json:"evalExpressions"`
+			WindowLength      interface{} `json:"windowLength"`
+			WindowFields      interface{} `json:"windowFields"`
+			FlappingDetection bool        `json:"flappingDetection"`
+			LabelSelector     struct {
+				AgentEnvironment string `json:"agent_environment"`
+			} `json:"labelSelector"`
+		} `json:"taskParameters"`
+		CreatedTimestamp time.Time `json:"createdTimestamp"`
+		UpdatedTimestamp time.Time `json:"updatedTimestamp"`
+	} `json:"content"`
+	Number        int  `json:"number"`
+	TotalPages    int  `json:"totalPages"`
+	TotalElements int  `json:"totalElements"`
+	Last          bool `json:"last"`
+	First         bool `json:"first"`
+}
+func createTask(c config) {
+	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/event-tasks/"
+	for {
+		body := doReq("GET", url,
+			"", "getting all tasks", c.regularToken)
+		var resp GetTasksResp
+		err := json.Unmarshal(body, &resp)
+		checkErr(err, "unable to parse get tasks response")
+		for _, i := range resp.Content {
+			// delete each task
+			_ = doReq("DELETE", url + i.ID, "", "deleting tasks" + i.ID, c.regularToken)
+
+		}
+		if resp.Last {
+			break
+		}
+	}
+
+	// Now create new one
+	data := fmt.Sprintf(taskData, "task_" + c.id, runtime.GOOS)
+	_ = doReq("POST", url, data, "creating private zone", c.regularToken)
 	
 }
