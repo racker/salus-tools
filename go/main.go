@@ -127,6 +127,7 @@ func main() {
 
 	releaseId := getReleases(c)
 	fmt.Println("gbjr: " + releaseId)
+	deleteAgentInstalls(c)
 
 
 	initEnvoy(c)
@@ -259,22 +260,11 @@ func getReleases(c config) string {
 		if !ok {
 			log.Fatal("no valid release found for this arch")
 		}
-		req, err := http.NewRequest("POST", c.adminApiUrl + "/api/agent-releases",
-			bytes.NewBuffer([]byte(releaseBody)))
-		checkErr(err, "unable to create release request")
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("x-auth-token", c.adminToken)
-		// Do the request
-		client := &http.Client{}
-		resp, err := client.Do(req)
-		checkErr(err, "unable to create release")
-		if resp.StatusCode != 200 {
-			log.Fatal("unable to create release")
-		}
+		newArBody := doReq("POST",  c.adminApiUrl + "/api/agent-releases",
+			releaseBody, "creating new agent release", c.adminToken)
 
-		body, err := ioutil.ReadAll(resp.Body)
 		createResp := new(AgentReleaseCreateResp)
-		err = json.Unmarshal(body, createResp)
+		err = json.Unmarshal(newArBody, createResp)
 		checkErr(err, "unable to parse create response")
 		return createResp.ID
 		} else {
@@ -292,7 +282,7 @@ func doReq(method string, url string, data string, errMessage string, token stri
 		client := &http.Client{}
 		resp, err := client.Do(req)
 		checkErr(err, "client create failed: " + errMessage)
-		if resp.StatusCode != 200 {
+		if resp.StatusCode/100 != 2 {
 			log.Fatal(errMessage + ": status code: " + resp.Status)
 		}
 		defer resp.Body.Close()
@@ -300,3 +290,44 @@ func doReq(method string, url string, data string, errMessage string, token stri
 		checkErr(err, "unable read response body: " + errMessage)
 		return body
 }
+type GetAgentInstallsResp struct {
+	Content []struct {
+		ID           string `json:"id"`
+		AgentRelease struct {
+			ID      string `json:"id"`
+			Type    string `json:"type"`
+			Version string `json:"version"`
+			Labels  struct {
+				AgentDiscoveredArch string `json:"agent_discovered_arch"`
+				AgentDiscoveredOs   string `json:"agent_discovered_os"`
+			} `json:"labels"`
+			URL              string    `json:"url"`
+			Exe              string    `json:"exe"`
+			CreatedTimestamp time.Time `json:"createdTimestamp"`
+			UpdatedTimestamp time.Time `json:"updatedTimestamp"`
+		} `json:"agentRelease"`
+		LabelSelector struct {
+			AgentDiscoveredOs string `json:"agent_discovered_os"`
+		} `json:"labelSelector"`
+		CreatedTimestamp time.Time `json:"createdTimestamp"`
+		UpdatedTimestamp time.Time `json:"updatedTimestamp"`
+	} `json:"content"`
+	Number        int  `json:"number"`
+	TotalPages    int  `json:"totalPages"`
+	TotalElements int  `json:"totalElements"`
+	Last          bool `json:"last"`
+	First         bool `json:"first"`
+}
+	func deleteAgentInstalls(c config) {
+		url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/agent-installs/"
+		installBody := doReq("GET", url,
+		"", "getting all agent installs", c.regularToken)
+		var resp GetAgentInstallsResp
+		err := json.Unmarshal(installBody, &resp)
+		checkErr(err, "unable to parse get agent installs response")
+		for _, i := range resp.Content {
+			// delete each install
+			_ = doReq("DELETE", url + i.ID, "", "deleting agent install" + i.ID, c.regularToken)
+
+		}
+	}
