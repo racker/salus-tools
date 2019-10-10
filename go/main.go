@@ -23,8 +23,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/coreos/go-semver/semver"
 	"github.com/satori/go.uuid"
 	"github.com/segmentio/kafka-go"
+	"runtime"
 	"html/template"
 	"io/ioutil"
 	"log"
@@ -32,6 +34,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 type LabelsType = struct {
@@ -84,9 +87,11 @@ type config = struct {
 	resourceId      string
 	tenantId        string
 	publicApiUrl    string
+	adminApiUrl		string
 	agentReleaseUrl string
 	certDir         string
 	regularToken    string
+	adminToken		string
 	dir             string
 }
 
@@ -99,9 +104,11 @@ func initConfig() config {
 	c.resourceId = "resourceId_" + c.id
 	c.tenantId = "aaaaaa"
 	c.publicApiUrl = "http://localhost:8080/"
+	c.adminApiUrl = "http://localhost:8888"
 	c.agentReleaseUrl = c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/agent-releases"
 	c.certDir = "/Users/geor7956/incoming/s4/salus-telemetry-bundle/dev/certs"
 	c.regularToken = ""
+	c.adminApiUrl = ""
 	dir, err := ioutil.TempDir("", "e2et")
 	checkErr(err, "error creating temp dir")
 	c.dir = dir
@@ -116,10 +123,12 @@ func checkErr(err error, message string) {
 
 func main() {
 	c := initConfig()
-	ar := getReleases(c)
-	fmt.Println("gbjcontent: " + ar.Content[0].Id)
-
 	fmt.Println("gbjdir: " + c.dir)
+
+	releaseId := getReleases(c)
+	fmt.Println("gbjr: " + releaseId)
+
+
 	initEnvoy(c)
 
 	message := `{"name": "` + c.privateZoneId + `"}`
@@ -186,8 +195,48 @@ func initEnvoy(c config) {
 		log.Fatal(err)
 	}
 }
+var linuxReleaseData =
+	`{
+  "type": "TELEGRAF",
+  "version": "1.11.0",
+  "labels": {
+    "agent_discovered_os": "linux",
+    "agent_discovered_arch": "amd64"
+  },
+  "url": "https://dl.influxdata.com/telegraf/releases/telegraf-1.11.0-static_linux_amd64.tar.gz",
+  "exe": "./telegraf/telegraf"
+}
+`
+	var darwinReleaseData =
+	`{
+  "type": "TELEGRAF",
+  "version": "1.11.0",
+  "labels": {
+    "agent_discovered_os": "darwin",
+    "agent_discovered_arch": "amd64"
+  },
+  "url": "https://homebrew.bintray.com/bottles/telegraf-1.11.0.high_sierra.bottle.tar.gz",
+  "exe": "telegraf/1.11.0/bin/telegraf"
+}`
+type AgentReleaseCreateResp struct {
+	ID      string `json:"id"`
+	Type    string `json:"type"`
+	Version string `json:"version"`
+	Labels  struct {
+		AgentDiscoveredOs   string `json:"agent_discovered_os"`
+		AgentDiscoveredArch string `json:"agent_discovered_arch"`
+	} `json:"labels"`
+	URL              string    `json:"url"`
+	Exe              string    `json:"exe"`
+	CreatedTimestamp time.Time `json:"createdTimestamp"`
+	UpdatedTimestamp time.Time `json:"updatedTimestamp"`
+}
 
-func getReleases(c config) *agentReleaseType {
+func getReleases(c config) string {
+	releaseData := make(map[string]string)
+	releaseData["linux-amd64"] = linuxReleaseData
+	releaseData["darwin-amd64"] = darwinReleaseData
+
 	req, err := http.NewRequest("GET", c.agentReleaseUrl, nil)
 	if err != nil {
 		log.Fatalln(err)
@@ -207,5 +256,44 @@ func getReleases(c config) *agentReleaseType {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	return ar
+
+	// get the latest matching release
+	var entry agentReleaseEntry
+	entry.Version = "0.0.0"
+	for _, r := range ar.Content {
+		if r.Labels.AgentDiscoveredArch == runtime.GOARCH &&
+			r.Labels.AgentDiscoveredOs == runtime.GOOS {
+			if semver.New(entry.Version).LessThan(*semver.New(r.Version)) {
+				entry = r
+			}
+		}
+	}
+	//create release if none exists
+	if entry.Version == "" {
+		releaseBody, ok := releaseData[runtime.GOOS + "-" + runtime.GOARCH]
+		if !ok {
+			log.Fatal("no valid release found for this arch")
+		}
+		req, err := http.NewRequest("POST", c.adminApiUrl + "/api/agent-releases",
+			bytes.NewBuffer([]byte(releaseBody)))
+		checkErr(err, "unable to create release request")
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("x-auth-token", c.adminToken)
+		// Do the request
+		client = &http.Client{}
+		resp, err = client.Do(req)
+		checkErr(err, "unable to create release")
+		if resp.StatusCode != 200 {
+			log.Fatal("unable to create release")
+		}
+
+		body, err := ioutil.ReadAll(resp.Body)
+		createResp := new(AgentReleaseCreateResp)
+		err = json.Unmarshal(body, createResp)
+		checkErr(err, "unable to parse create response")
+		return createResp.ID
+		} else {
+			return entry.Id
+	}
+	
 }
