@@ -183,15 +183,16 @@ func main() {
 	deleteMonitors(c)
 	createPrivateZone(c)
 	
-	initEnvoy(c, releaseId)
+	cmd := initEnvoy(c, releaseId)
 	createTask(c)
 	eventFound := make(chan bool, 1)
 	go checkForEvents(c, eventFound)
 	createMonitor(c)
 	<-eventFound
+	cmd.Process.Kill()
 }
 
-func initEnvoy(c config, releaseId string) {
+func initEnvoy(c config, releaseId string) (cmd *exec.Cmd) {
 	log.Println("starting envoy")
 	configFileName := c.dir + "/config.yml"
 	f, err := os.Create(configFileName)
@@ -212,7 +213,7 @@ func initEnvoy(c config, releaseId string) {
 	tmpl.Execute(f, TemplateFields{c.resourceId, c.privateZoneId,
 		c.certDir, os.Getenv("GBJ_API_KEY"), c.regularId})
 	envoyExeDir := "/Users/geor7956/go/bin/"
-	cmd := exec.Command(envoyExeDir+"telemetry-envoy", "run", "--config="+configFileName)
+	cmd = exec.Command(envoyExeDir+"telemetry-envoy", "run", "--config="+configFileName)
 	cmd.Dir = c.dir
 	cmd.Stdout, err = os.Create(c.dir + "/envoyStdout")
 	if err != nil {
@@ -247,6 +248,7 @@ func initEnvoy(c config, releaseId string) {
 		log.Fatal("install failed")
 	}
 	log.Println("envoy started")
+	return cmd
 }
 var linuxReleaseData =
 	`{
@@ -582,7 +584,7 @@ func createTask(c config) {
 	}
 
 	// Now create new one
-	data := fmt.Sprintf(taskData, "task_" + c.id, runtime.GOOS)
+	data := fmt.Sprintf(taskData, "net_response_task_" + c.id, runtime.GOOS)
 	_ = doReq("POST", url, data, "creating task", c.regularToken)
 	
 }
