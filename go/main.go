@@ -20,6 +20,8 @@ package main
 
 import (
 	"bytes"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"github.com/coreos/go-semver/semver"
@@ -35,6 +37,8 @@ import (
 	"strings"
 	"time"
 	"context"
+	"github.com/spf13/viper"
+	//"flag"
 )
 
 type LabelsType = struct {
@@ -58,6 +62,7 @@ type TemplateFields = struct {
 	PrivateZoneID string
 	CertDir       string
 	ApiKey        string
+	RegularId        string
 }
 
 var localConfigTemplate = `resource_id: {{.ResourceId}}
@@ -89,7 +94,7 @@ tls:
     token_provider: keystone_v2
   token_providers:
     keystone_v2:
-      username: "gjahad"
+      username: "{{.RegularId}}"
       apikey: "{{.ApiKey}}"
 ambassador:
   address: salus-ambassador.dev.monplat.rackspace.net:443
@@ -102,6 +107,7 @@ type config = struct {
 	privateZoneId   string
 	resourceId      string
 	tenantId        string
+	regularId       string
 	publicApiUrl    string
 	adminApiUrl		string
 	agentReleaseUrl string
@@ -109,33 +115,47 @@ type config = struct {
 	regularToken    string
 	adminToken		string
 	dir             string
-	kafkaBroker     string
+	kafkaBrokers    []string
 	topic           string
 	port            string
+	certFile string
+	keyFile string
+	caFile string
 }
 
 func initConfig() config {
+	//cfgFile := flag.String("cfgFile", "config.yml", "config file")
+	cfgFile := "/Users/geor7956/incoming/s4/salus-telemetry-bundle/tools/go/config.dev.yml"
+	viper.SetConfigFile(cfgFile)
+	if err := viper.ReadInConfig(); err == nil {
+		log.Println("loaded: " + cfgFile)
+	} else {
+		log.Fatal("Config file not found" + cfgFile)
+	}
 	var c config
 	c.currentUUID = uuid.NewV4()
 	c.id = strings.Replace(c.currentUUID.String(), "-", "", -1)
 	c.privateZoneId = "privateZone_" + c.id
-	//c.privateZoneId = "dummy"
 	c.resourceId = "resourceId_" + c.id
-	c.tenantId = "923886"
-	c.publicApiUrl = "http://salus-api.dev.monplat.rackspace.net/"
-	c.adminApiUrl = "http://localhost:8888"
+	c.tenantId = viper.GetString("tenantId")
+	c.publicApiUrl = viper.GetString("publicApiUrl")
+	c.adminApiUrl = viper.GetString("adminApiUrl")
 	c.agentReleaseUrl = c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/agent-releases"
-	c.certDir = "/Users/geor7956/incoming/s4/salus-telemetry-bundle/dev/certs"
-	c.regularToken = "AAAZNyC9aBT55WH_LPDJbYSPEraSPKrETjmrojv4jQzUzAlMaHawBn3WGYPWh_U267H46RMyotSY3ZrysFxh98JOYj-9X9Gfr7MxxADMJvUMZhC-FBxBuuRH1pyIIiHrWuykv3x5HL5yfw"
-	c.adminToken = "AAAZNyC9E9huap7JZNPXpxjXUf0rR2k__pjcYqFdiRx5-JW-0blyKOROgE8ly2ZerQ3xttiwRxC6bWNZzS_U-oJtTA6V-2HPzj8cUxPcZys8KZe1ytAWauto"
-	c.adminApiUrl = "http://salus-api-admin.dev.monplat.rackspace.net"
+	c.certDir = viper.GetString("certDir")
+	c.regularToken = "AADSH5trs1pHT2ZqqKHQfkeI2F2aMQFMCincDY0NB-nX0QM7qjeSOQFKMEghGdnLgBnJAH_5D531J4eJGiFZaeGNHa1oWEqRLwFQe8Q3PDN-d8nQAGohh_JYRIMonzZC4FDIO4IoYVEe4g"
+	c.adminToken = "AADSH5tr4v_5_p-cz_SsUYCr7hreLKMfQvbfPEwtAx2DpEMgxg1MSA8dwewUrrLuSIg7oZF49RPk-EebBOFEmbAC7y6zbTJ-lN55gxMY2ArKtHTuTJlDroS9"
+	c.regularId = viper.GetString("regularId")
 	dir, err := ioutil.TempDir("", "e2et")
 	checkErr(err, "error creating temp dir")
 	c.dir = dir
-	c.kafkaBroker = "localhost:9092"
-	c.topic = "salus.events.json"
+	//_ = viper.UnmarshalKey("kafkaBrokers", c.kafkaBrokers)
+	c.kafkaBrokers = viper.GetStringSlice("kafkaBrokers")
+	c.topic = viper.GetString("topic")
 	//gbj pick port dynamically
 	c.port = "8222"
+	c.certFile = viper.GetString("certFile")
+	c.keyFile = viper.GetString("keyFile")
+	c.caFile = viper.GetString("caFile")
 	return c
 }
 
@@ -175,7 +195,9 @@ func initEnvoy(c config, releaseId string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	tmpl.Execute(f, TemplateFields{c.resourceId, c.privateZoneId, c.certDir, os.Getenv("GBJ_API_KEY")})
+
+	tmpl.Execute(f, TemplateFields{c.resourceId, c.privateZoneId,
+		c.certDir, os.Getenv("GBJ_API_KEY"), c.regularId})
 	envoyExeDir := "/Users/geor7956/go/bin/"
 	cmd := exec.Command(envoyExeDir+"telemetry-envoy", "run", "--config="+configFileName)
 	cmd.Dir = c.dir
@@ -193,22 +215,24 @@ func initEnvoy(c config, releaseId string) {
 	}
 
 	// give it time to start
-	time.Sleep(10 * time.Second)
-	if _, err = os.Stat(c.dir + "/data-telemetry-envoy"); err == nil {
-		log.Fatal("installs incorrectly removed")
-	}
-	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/agent-installs"
-	installData := `{
-	"agentReleaseId": "%s",
-	"labelSelector": {
-		"agent_discovered_os": "%s"
-	}}`
-	_ = doReq("POST", url, fmt.Sprintf(installData, releaseId, runtime.GOOS), "creating agent install", c.regularToken)
-	// give it time to install
-	time.Sleep(10 * time.Second)
-	if _, err = os.Stat(c.dir + "/data-telemetry-envoy"); err != nil {
-		log.Fatal("install failed")
-	}
+//	time.Sleep(10 * time.Second)
+	// if _, err = os.Stat(c.dir + "/data-telemetry-envoy"); err == nil {
+	// 	log.Fatal("installs incorrectly removed")
+	// }
+	// url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/agent-installs"
+	// installData := `{
+	// "agentReleaseId": "%s",
+	// "labelSelector": {
+	// 	"agent_discovered_os": "%s"
+	// }}`
+
+	// log.Println("gbj create install %s %s", url, fmt.Sprintf(installData, releaseId, runtime.GOOS))
+	// _ = doReq("POST", url, fmt.Sprintf(installData, releaseId, runtime.GOOS), "creating agent install", c.regularToken)
+	// // give it time to install
+	// time.Sleep(10 * time.Second)
+	// if _, err = os.Stat(c.dir + "/data-telemetry-envoy"); err != nil {
+	// 	log.Fatal("install failed")
+	// }
 	log.Println("envoy started")
 }
 var linuxReleaseData =
@@ -254,6 +278,7 @@ func getReleases(c config) string {
 	releaseData["darwin-amd64"] = darwinReleaseData
 
 	var ar agentReleaseType
+	log.Println("gbj get: %s %s", c.agentReleaseUrl, c.regularToken)
 	arBody := doReq("GET", c.agentReleaseUrl, "", "getting all agent releases",
 		c.regularToken)
 	err := json.Unmarshal(arBody, &ar)
@@ -275,7 +300,7 @@ func getReleases(c config) string {
 		if !ok {
 			log.Fatal("no valid release found for this arch")
 		}
-		newArBody := doReq("POST",  c.adminApiUrl + "/api/agent-releases",
+		newArBody := doReq("POST",  c.adminApiUrl + "api/agent-releases",
 			releaseBody, "creating new agent release", c.adminToken)
 
 		createResp := new(AgentReleaseCreateResp)
@@ -333,7 +358,8 @@ type GetAgentInstallsResp struct {
 	Last          bool `json:"last"`
 	First         bool `json:"first"`
 }
-	func deleteAgentInstalls(c config) {
+func deleteAgentInstalls(c config) {
+	log.Println("deleting AgentInstalls")
 		url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/agent-installs/"
 		installBody := doReq("GET", url,
 		"", "getting all agent installs", c.regularToken)
@@ -342,6 +368,7 @@ type GetAgentInstallsResp struct {
 		checkErr(err, "unable to parse get agent installs response")
 		for _, i := range resp.Content {
 			// delete each install
+			log.Println("gbj deleting: " + url +i.ID)
 			_ = doReq("DELETE", url + i.ID, "", "deleting agent install " + i.ID, c.regularToken)
 
 		}
@@ -370,6 +397,7 @@ type GetResourcesResp struct {
 	First         bool `json:"first"`
 }
 func deleteResources(c config) {
+	log.Println("deleting Resources")
 	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/resources/"
 	body := doReq("GET", url,
 		"", "getting all resources", c.regularToken)
@@ -377,6 +405,7 @@ func deleteResources(c config) {
 	err := json.Unmarshal(body, &resp)
 	checkErr(err, "unable to parse get resources response")
 	for _, i := range resp.Content {
+		log.Println("delete resource: " + i.ResourceID)
 		// delete each resource
 		_ = doReq("DELETE", url + i.ResourceID, "", "deleting resource " + i.ResourceID, c.regularToken)
 
@@ -422,6 +451,7 @@ type GetMonitorsResp struct {
 }
 
 func deleteMonitors(c config) {
+	log.Println("deleting Monitors")
 	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/monitors/"
 	for {
 		body := doReq("GET", url,
@@ -441,6 +471,7 @@ func deleteMonitors(c config) {
 }
 
 func createPrivateZone(c config) {
+	log.Println("deleting private zones")
 	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/zones/"
 	for {
 		body := doReq("GET", url,
@@ -461,6 +492,7 @@ func createPrivateZone(c config) {
 
 	// Now create new one
 	message := `{"name": "` + c.privateZoneId + `"}`
+	log.Println("creating zone: %s %s", url, message)
 	_ = doReq("POST", url, message, "creating private zone", c.regularToken)
 	
 }
@@ -518,6 +550,7 @@ type GetTasksResp struct {
 	First         bool `json:"first"`
 }
 func createTask(c config) {
+	log.Println("deleting Tasks")
 	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/event-tasks/"
 	for {
 		body := doReq("GET", url,
@@ -537,16 +570,43 @@ func createTask(c config) {
 
 	// Now create new one
 	data := fmt.Sprintf(taskData, "task_" + c.id, runtime.GOOS)
-	_ = doReq("POST", url, data, "creating private zone", c.regularToken)
+	_ = doReq("POST", url, data, "creating task", c.regularToken)
 	
 }
 
 func checkForEvents(c config, eventFound chan bool) {
+		// Load client cert
+	cert, err := tls.LoadX509KeyPair(c.certFile, c.keyFile)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Load CA cert
+	caCert, err := ioutil.ReadFile(c.caFile)
+	if err != nil {
+		log.Fatal(err)
+	}
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(caCert)
+
+	// Setup HTTPS client
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		RootCAs:      caCertPool,
+	}
+	tlsConfig.BuildNameToCertificate()
+dialer := &kafka.Dialer{
+    Timeout:   10 * time.Second,
+    DualStack: true,
+    TLS:       tlsConfig,
+}
+
 	r := kafka.NewReader(kafka.ReaderConfig{
-		Brokers:  []string{c.kafkaBroker},
+		Brokers:  c.kafkaBrokers,
 		Topic:    c.topic,
 		MinBytes: 1,    // 10KB
 		MaxBytes: 10e6, // 10MB
+       	    Dialer:         dialer,
 	})
 
 	for {
@@ -582,6 +642,8 @@ var monitorData =
   }
 }`
 func createMonitor(c config ) {
+	log.Println("creating Monitor")
+	
 	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/monitors/"
 	data := fmt.Sprintf(monitorData, runtime.GOOS, c.privateZoneId, c.port)
 	_ = doReq("POST", url, data, "creating monitor", c.regularToken)
