@@ -102,6 +102,7 @@ agents:
   dataPath: data-telemetry-envoy
 `
 type config = struct {
+	env string
 	currentUUID     uuid.UUID
 	id              string
 	privateZoneId   string
@@ -124,8 +125,13 @@ type config = struct {
 }
 
 func initConfig() config {
+	replacer := strings.NewReplacer(".", "_", "-", "_")
+	viper.SetEnvKeyReplacer(replacer)
+	viper.SetEnvPrefix("E2ET")
+	viper.AutomaticEnv() // read in environment variables that match
+
 	//cfgFile := flag.String("cfgFile", "config.yml", "config file")
-	cfgFile := "/Users/geor7956/incoming/s4/salus-telemetry-bundle/tools/go/config.dev.yml"
+	cfgFile := "/Users/geor7956/incoming/s4/salus-telemetry-bundle/tools/go/config-local.yml"
 	viper.SetConfigFile(cfgFile)
 	if err := viper.ReadInConfig(); err == nil {
 		log.Println("loaded: " + cfgFile)
@@ -133,6 +139,7 @@ func initConfig() config {
 		log.Fatal("Config file not found" + cfgFile)
 	}
 	var c config
+	c.env = viper.GetString("env")
 	c.currentUUID = uuid.NewV4()
 	c.id = strings.Replace(c.currentUUID.String(), "-", "", -1)
 	c.privateZoneId = "privateZone_" + c.id
@@ -191,7 +198,13 @@ func initEnvoy(c config, releaseId string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	tmpl, err := template.New("t1").Parse(remoteConfigTemplate)
+	var configTemplate string
+	if (c.env == "local") {
+		configTemplate = localConfigTemplate
+	} else {
+		configTemplate = remoteConfigTemplate
+	}
+	tmpl, err := template.New("t1").Parse(configTemplate)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -215,24 +228,24 @@ func initEnvoy(c config, releaseId string) {
 	}
 
 	// give it time to start
-//	time.Sleep(10 * time.Second)
-	// if _, err = os.Stat(c.dir + "/data-telemetry-envoy"); err == nil {
-	// 	log.Fatal("installs incorrectly removed")
-	// }
-	// url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/agent-installs"
-	// installData := `{
-	// "agentReleaseId": "%s",
-	// "labelSelector": {
-	// 	"agent_discovered_os": "%s"
-	// }}`
+	time.Sleep(10 * time.Second)
+	if _, err = os.Stat(c.dir + "/data-telemetry-envoy"); err == nil {
+		log.Fatal("installs incorrectly removed")
+	}
+	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/agent-installs"
+	installData := `{
+	"agentReleaseId": "%s",
+	"labelSelector": {
+		"agent_discovered_os": "%s"
+	}}`
 
-	// log.Println("gbj create install %s %s", url, fmt.Sprintf(installData, releaseId, runtime.GOOS))
-	// _ = doReq("POST", url, fmt.Sprintf(installData, releaseId, runtime.GOOS), "creating agent install", c.regularToken)
-	// // give it time to install
-	// time.Sleep(10 * time.Second)
-	// if _, err = os.Stat(c.dir + "/data-telemetry-envoy"); err != nil {
-	// 	log.Fatal("install failed")
-	// }
+	log.Println("gbj create install %s %s", url, fmt.Sprintf(installData, releaseId, runtime.GOOS))
+	_ = doReq("POST", url, fmt.Sprintf(installData, releaseId, runtime.GOOS), "creating agent install", c.regularToken)
+	// give it time to install
+	time.Sleep(10 * time.Second)
+	if _, err = os.Stat(c.dir + "/data-telemetry-envoy"); err != nil {
+		log.Fatal("install failed")
+	}
 	log.Println("envoy started")
 }
 var linuxReleaseData =
@@ -575,40 +588,51 @@ func createTask(c config) {
 }
 
 func checkForEvents(c config, eventFound chan bool) {
+	var r *kafka.Reader
+	if (c.env == "local") {
+
+		r = kafka.NewReader(kafka.ReaderConfig{
+			Brokers:  c.kafkaBrokers,
+			Topic:    c.topic,
+			MinBytes: 1,    // 10KB
+			MaxBytes: 10e6, // 10MB
+		})
+
+	} else {
 		// Load client cert
-	cert, err := tls.LoadX509KeyPair(c.certFile, c.keyFile)
-	if err != nil {
-		log.Fatal(err)
+		cert, err := tls.LoadX509KeyPair(c.certFile, c.keyFile)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// Load CA cert
+		caCert, err := ioutil.ReadFile(c.caFile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		caCertPool := x509.NewCertPool()
+		caCertPool.AppendCertsFromPEM(caCert)
+
+		// Setup HTTPS client
+		tlsConfig := &tls.Config{
+			Certificates: []tls.Certificate{cert},
+			RootCAs:      caCertPool,
+		}
+		tlsConfig.BuildNameToCertificate()
+		dialer := &kafka.Dialer{
+			Timeout:   10 * time.Second,
+			DualStack: true,
+			TLS:       tlsConfig,
+		}
+
+		r = kafka.NewReader(kafka.ReaderConfig{
+			Brokers:  c.kafkaBrokers,
+			Topic:    c.topic,
+			MinBytes: 1,    // 10KB
+			MaxBytes: 10e6, // 10MB
+			Dialer:   dialer,
+		})
 	}
-
-	// Load CA cert
-	caCert, err := ioutil.ReadFile(c.caFile)
-	if err != nil {
-		log.Fatal(err)
-	}
-	caCertPool := x509.NewCertPool()
-	caCertPool.AppendCertsFromPEM(caCert)
-
-	// Setup HTTPS client
-	tlsConfig := &tls.Config{
-		Certificates: []tls.Certificate{cert},
-		RootCAs:      caCertPool,
-	}
-	tlsConfig.BuildNameToCertificate()
-dialer := &kafka.Dialer{
-    Timeout:   10 * time.Second,
-    DualStack: true,
-    TLS:       tlsConfig,
-}
-
-	r := kafka.NewReader(kafka.ReaderConfig{
-		Brokers:  c.kafkaBrokers,
-		Topic:    c.topic,
-		MinBytes: 1,    // 10KB
-		MaxBytes: 10e6, // 10MB
-       	    Dialer:         dialer,
-	})
-
 	for {
 		m, err := r.ReadMessage(context.Background())
 		if err != nil {
