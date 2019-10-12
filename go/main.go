@@ -184,12 +184,13 @@ func main() {
 	createPrivateZone(c)
 	
 	cmd := initEnvoy(c, releaseId)
+	defer cmd.Process.Kill()
 	createTask(c)
 	eventFound := make(chan bool, 1)
 	go checkForEvents(c, eventFound)
 	createMonitor(c)
 	<-eventFound
-	cmd.Process.Kill()
+
 }
 
 func initEnvoy(c config, releaseId string) (cmd *exec.Cmd) {
@@ -337,12 +338,14 @@ func doReq(method string, url string, data string, errMessage string, token stri
 		client := &http.Client{}
 		resp, err := client.Do(req)
 		checkErr(err, "client create failed: " + errMessage)
-		if resp.StatusCode/100 != 2 {
-			log.Fatal(errMessage + ": status code: " + resp.Status)
-		}
 		defer resp.Body.Close()
 		body, err := ioutil.ReadAll(resp.Body)
 		checkErr(err, "unable read response body: " + errMessage)
+		if resp.StatusCode/100 != 2 {
+			log.Println(errMessage + ": " + string(body))
+			log.Fatal("status code: " + resp.Status)
+		}
+
 		return body
 }
 type GetAgentInstallsResp struct {
@@ -635,6 +638,7 @@ func checkForEvents(c config, eventFound chan bool) {
 			Dialer:   dialer,
 		})
 	}
+	log.Println("waiting for events")
 	for {
 		m, err := r.ReadMessage(context.Background())
 		if err != nil {
@@ -643,7 +647,7 @@ func checkForEvents(c config, eventFound chan bool) {
 		log.Printf("message at topic/partition/offset %v/%v/%v: %s = %s\n", m.Topic, m.Partition, m.Offset, string(m.Key), string(m.Value))
 		s := string(m.Value)
 		if strings.Contains(s, c.resourceId) {
-			eventFound <- true
+//GBJFIX			eventFound <- true
 		}
 	}
 
@@ -651,7 +655,7 @@ func checkForEvents(c config, eventFound chan bool) {
 	
 }
 
-var monitorData =
+var netMonitorData =
 	`{
   "labelSelector": {
     "agent_discovered_os": "%s"
@@ -667,12 +671,34 @@ var monitorData =
     }
   }
 }`
+var httpMonitorData =
+	`{
+  "labelSelector": {
+    "agent_discovered_os": "%s"
+  },
+  "interval": "PT30S",
+  "details": {
+    "type": "remote",
+    "monitoringZones": ["%s"],
+    "plugin": {
+      "type": "http_response",
+      "address": "http://localhost:%s",
+      "responseTimeout": "3s",
+      "method": "GET"
+    }
+  }
+}`
 func createMonitor(c config ) {
-	log.Println("creating Monitor")
+	log.Println("creating Monitors")
 	
-	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/monitors/"
-	data := fmt.Sprintf(monitorData, runtime.GOOS, c.privateZoneId, c.port)
-	_ = doReq("POST", url, data, "creating monitor", c.regularToken)
-	log.Println("monitor created")
+	// url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/monitors/"
+	// data := fmt.Sprintf(netMonitorData, runtime.GOOS, c.privateZoneId, c.port)
+	// _ = doReq("POST", url, data, "creating net monitor", c.regularToken)
+
+//	adminUrl := c.adminApiUrl + "api/policy-monitors"
+	adminUrl := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/monitors/"
+	data := fmt.Sprintf(httpMonitorData, runtime.GOOS, c.privateZoneId, c.port)
+	_ = doReq("POST", adminUrl, data, "creating http monitor", c.adminToken)
+	log.Println("monitors created")
 
 }
