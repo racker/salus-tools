@@ -109,6 +109,7 @@ type config = struct {
 	resourceId      string
 	tenantId        string
 	regularId       string
+	adminId       string
 	publicApiUrl    string
 	adminApiUrl		string
 	agentReleaseUrl string
@@ -122,6 +123,9 @@ type config = struct {
 	certFile string
 	keyFile string
 	caFile string
+	regularApiKey string
+	adminApiKey string
+	adminPassword string
 }
 
 func initConfig() config {
@@ -131,7 +135,7 @@ func initConfig() config {
 	viper.AutomaticEnv() // read in environment variables that match
 
 	//cfgFile := flag.String("cfgFile", "config.yml", "config file")
-	cfgFile := "/Users/geor7956/incoming/s4/salus-telemetry-bundle/tools/go/config-local.yml"
+	cfgFile := "/Users/geor7956/incoming/s4/salus-telemetry-bundle/tools/go/config.dev.yml"
 	viper.SetConfigFile(cfgFile)
 	if err := viper.ReadInConfig(); err == nil {
 		log.Println("loaded: " + cfgFile)
@@ -149,9 +153,8 @@ func initConfig() config {
 	c.adminApiUrl = viper.GetString("adminApiUrl")
 	c.agentReleaseUrl = c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/agent-releases"
 	c.certDir = viper.GetString("certDir")
-	c.regularToken = "AADSH5trs1pHT2ZqqKHQfkeI2F2aMQFMCincDY0NB-nX0QM7qjeSOQFKMEghGdnLgBnJAH_5D531J4eJGiFZaeGNHa1oWEqRLwFQe8Q3PDN-d8nQAGohh_JYRIMonzZC4FDIO4IoYVEe4g"
-	c.adminToken = "AADSH5tr4v_5_p-cz_SsUYCr7hreLKMfQvbfPEwtAx2DpEMgxg1MSA8dwewUrrLuSIg7oZF49RPk-EebBOFEmbAC7y6zbTJ-lN55gxMY2ArKtHTuTJlDroS9"
 	c.regularId = viper.GetString("regularId")
+	c.adminId = viper.GetString("adminId")
 	dir, err := ioutil.TempDir("", "e2et")
 	checkErr(err, "error creating temp dir")
 	c.dir = dir
@@ -163,9 +166,88 @@ func initConfig() config {
 	c.certFile = viper.GetString("certFile")
 	c.keyFile = viper.GetString("keyFile")
 	c.caFile = viper.GetString("caFile")
+	c.regularApiKey = os.Getenv("E2ET_REGULAR_API_KEY")
+	c.adminApiKey = os.Getenv("E2ET_ADMIN_API_KEY")
+	c.adminPassword = os.Getenv("E2ET_ADMIN_PASSWORD")
+	c.regularToken = getToken(c.regularId, c.regularApiKey, "")
+	c.adminToken = getToken(c.adminId, c.adminApiKey, c.adminPassword)
 	return c
 }
 
+
+const apiTokenData =
+	`{
+    "auth": {
+       "RAX-KSKEY:apiKeyCredentials": {  
+          "username": "%s",  
+          "apiKey": "%s"}
+    }  
+}`
+const pwTokenData =
+	`{
+   "auth": {
+       "passwordCredentials": {
+          "username":"%s",
+          "password":"%s"
+       }
+    }
+}`
+
+type IdentityResp struct {
+	Access struct {
+		ServiceCatalog []struct {
+			Endpoints []struct {
+				TenantID  string `json:"tenantId"`
+				PublicURL string `json:"publicURL"`
+				Region    string `json:"region"`
+			} `json:"endpoints"`
+			Name string `json:"name"`
+			Type string `json:"type"`
+		} `json:"serviceCatalog"`
+		User struct {
+			RAXAUTHSessionInactivityTimeout string `json:"RAX-AUTH:sessionInactivityTimeout"`
+			RAXAUTHDefaultRegion            string `json:"RAX-AUTH:defaultRegion"`
+			Roles                           []struct {
+				Name        string `json:"name"`
+				TenantID    string `json:"tenantId,omitempty"`
+				Description string `json:"description"`
+				ID          string `json:"id"`
+			} `json:"roles"`
+			RAXAUTHPhonePin      string `json:"RAX-AUTH:phonePin"`
+			Name                 string `json:"name"`
+			ID                   string `json:"id"`
+			RAXAUTHDomainID      string `json:"RAX-AUTH:domainId"`
+			RAXAUTHPhonePinState string `json:"RAX-AUTH:phonePinState"`
+		} `json:"user"`
+		Token struct {
+			Expires                time.Time `json:"expires"`
+			RAXAUTHIssued          time.Time `json:"RAX-AUTH:issued"`
+			RAXAUTHAuthenticatedBy []string  `json:"RAX-AUTH:authenticatedBy"`
+			ID                     string    `json:"id"`
+			Tenant                 struct {
+				Name string `json:"name"`
+				ID   string `json:"id"`
+			} `json:"tenant"`
+		} `json:"token"`
+	} `json:"access"`
+}
+func getToken(user string, apiKey string, pw string) (string) {
+	if user == "" {
+		return ""
+	}
+	url := "https://identity.api.rackspacecloud.com/v2.0/tokens"
+	var tokenData string
+	if pw != "" {
+		tokenData = fmt.Sprintf(pwTokenData, user, pw)
+	} else {
+		tokenData = fmt.Sprintf(apiTokenData, user, apiKey)
+	}
+	var resp IdentityResp
+	body := doReq("POST", url, tokenData, "getting token for : " + user, "")
+	err := json.Unmarshal(body, &resp)
+	checkErr(err, "unable to parse identity response")
+	return resp.Access.Token.ID
+}
 func checkErr(err error, message string) {
 	if err != nil {
 		log.Fatal(message + ":" + err.Error())
@@ -212,7 +294,7 @@ func initEnvoy(c config, releaseId string) (cmd *exec.Cmd) {
 	}
 
 	tmpl.Execute(f, TemplateFields{c.resourceId, c.privateZoneId,
-		c.certDir, os.Getenv("GBJ_API_KEY"), c.regularId})
+		c.certDir, c.regularApiKey, c.regularId})
 	envoyExeDir := "/Users/geor7956/go/bin/"
 	cmd = exec.Command(envoyExeDir+"telemetry-envoy", "run", "--config="+configFileName)
 	cmd.Dir = c.dir
@@ -230,24 +312,24 @@ func initEnvoy(c config, releaseId string) (cmd *exec.Cmd) {
 	}
 
 	// give it time to start
-	time.Sleep(10 * time.Second)
-	if _, err = os.Stat(c.dir + "/data-telemetry-envoy"); err == nil {
-		log.Fatal("installs incorrectly removed")
-	}
-	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/agent-installs"
-	installData := `{
-	"agentReleaseId": "%s",
-	"labelSelector": {
-		"agent_discovered_os": "%s"
-	}}`
+	// time.Sleep(10 * time.Second)
+	// if _, err = os.Stat(c.dir + "/data-telemetry-envoy"); err == nil {
+	// 	log.Fatal("installs incorrectly removed")
+	// }
+	// url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/agent-installs"
+	// installData := `{
+	// "agentReleaseId": "%s",
+	// "labelSelector": {
+	// 	"agent_discovered_os": "%s"
+	// }}`
 
-	log.Println("gbj create install %s %s", url, fmt.Sprintf(installData, releaseId, runtime.GOOS))
-	_ = doReq("POST", url, fmt.Sprintf(installData, releaseId, runtime.GOOS), "creating agent install", c.regularToken)
-	// give it time to install
-	time.Sleep(10 * time.Second)
-	if _, err = os.Stat(c.dir + "/data-telemetry-envoy"); err != nil {
-		log.Fatal("install failed")
-	}
+	// log.Println("gbj create install %s %s", url, fmt.Sprintf(installData, releaseId, runtime.GOOS))
+	// _ = doReq("POST", url, fmt.Sprintf(installData, releaseId, runtime.GOOS), "creating agent install", c.regularToken)
+	// // give it time to install
+	// time.Sleep(10 * time.Second)
+	// if _, err = os.Stat(c.dir + "/data-telemetry-envoy"); err != nil {
+	// 	log.Fatal("install failed")
+	// }
 	log.Println("envoy started")
 	return cmd
 }
@@ -329,7 +411,16 @@ func getReleases(c config) string {
 	
 }
 
+const curlOutput = `
+curl %s  \
+    -X %s \
+    -d '%s' \
+    -H "Content-type: application/json" \
+    -H "x-auth-token: %s"
+`
 func doReq(method string, url string, data string, errMessage string, token string) ([]byte){
+//	log.Printf("Running equivalent curl:\n %s",
+//		fmt.Sprintf(curlOutput, url, method, strings.Replace(data, "\n", "", -1), token))
 		req, err := http.NewRequest(method, url, bytes.NewBuffer([]byte(data)))
 		checkErr(err, "request create failed: " + errMessage)
 		req.Header.Set("Content-Type", "application/json")
@@ -698,7 +789,7 @@ func createMonitor(c config ) {
 //	adminUrl := c.adminApiUrl + "api/policy-monitors"
 	adminUrl := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/monitors/"
 	data := fmt.Sprintf(httpMonitorData, runtime.GOOS, c.privateZoneId, c.port)
-	_ = doReq("POST", adminUrl, data, "creating http monitor", c.adminToken)
+	_ = doReq("POST", adminUrl, data, "creating http monitor", c.regularToken)
 	log.Println("monitors created")
 
 }
