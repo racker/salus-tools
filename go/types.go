@@ -245,3 +245,28 @@ type GetPoliciesResp struct {
 	Last          bool `json:"last"`
 	First         bool `json:"first"`
 }
+
+type CreatePolicyMonitorResp struct {
+	ID            string      `json:"id"`
+	Name          interface{} `json:"name"`
+	LabelSelector struct {
+		AgentDiscoveredOs string `json:"agent_discovered_os"`
+	} `json:"labelSelector"`
+	LabelSelectorMethod string      `json:"labelSelectorMethod"`
+	ResourceID          interface{} `json:"resourceId"`
+	Interval            string      `json:"interval"`
+	Details             struct {
+		Type            string   `json:"type"`
+		MonitoringZones []string `json:"monitoringZones"`
+		Plugin          struct {
+			Type               string `json:"type"`
+			Address            string `json:"address"`
+			ResponseTimeout    string `json:"responseTimeout"`
+			Method             string `json:"method"`
+			FollowRedirects    bool   `json:"followRedirects"`
+			InsecureSkipVerify bool   `json:"insecureSkipVerify"`
+		} `json:"plugin"`
+	} `json:"details"`
+	CreatedTimestamp time.Time `json:"createdTimestamp"`
+	UpdatedTimestamp time.Time `json:"updatedTimestamp"`
+}
