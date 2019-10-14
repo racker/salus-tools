@@ -1,5 +1,5 @@
 /*
- *    Copyright 2018 Rackspace US, Inc.
+ *    Copyright 2019 Rackspace US, Inc.
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
@@ -84,7 +84,6 @@ func initConfig() config {
 	viper.AutomaticEnv() // read in environment variables that match
 
 	cfgFile := flag.String("config", "config.yml", "config file")
-	//	cfgFile := "/Users/geor7956/incoming/s4/salus-telemetry-bundle/tools/go/config.dev.yml"
 	flag.Parse()
 	viper.SetConfigFile(*cfgFile)
 	if err := viper.ReadInConfig(); err == nil {
@@ -108,10 +107,9 @@ func initConfig() config {
 	dir, err := ioutil.TempDir("", "e2et")
 	checkErr(err, "error creating temp dir")
 	c.dir = dir
-	//_ = viper.UnmarshalKey("kafkaBrokers", c.kafkaBrokers)
 	c.kafkaBrokers = viper.GetStringSlice("kafkaBrokers")
 	c.topic = viper.GetString("topic")
-	//gbj pick port dynamically
+	//gbj pick port dynamically?
 	c.port = "8222"
 	c.publicZoneId = "public/us_central_1"
 	c.certFile = viper.GetString("certFile")
@@ -167,10 +165,9 @@ func checkErr(err error, message string) {
 func main() {
 	log.Println("Starting e2et")
 	c := initConfig()
-	fmt.Println("gbjdir: " + c.dir)
+	fmt.Println("Temp dir is : " + c.dir)
 
 	releaseId := getReleases(c)
-	fmt.Println("gbjr: " + releaseId)
 	deleteAgentInstalls(c)
 	deleteResources(c)
 	deleteMonitors(c)
@@ -182,12 +179,13 @@ func main() {
 	eventFound := make(chan bool, 1)
 	go checkForEvents(c, eventFound)
 	createMonitor(c)
-	//	createPolicyMonitor(c)
-	//	checkPresenceMonitor(c)
+	createPolicyMonitor(c)
+	checkPresenceMonitor(c)
+	log.Println("looking for events:")
 	select {
 	case <-eventFound:
 		log.Println("events returned from kafka successfully")
-	case <-time.After(5 * time.Minute):
+	case <-time.After(10 * time.Minute):
 		log.Fatal("Timed out waiting for events")
 	}
 
@@ -213,6 +211,7 @@ func initEnvoy(c config, releaseId string) (cmd *exec.Cmd) {
 
 	tmpl.Execute(f, TemplateFields{c.resourceId, c.privateZoneId,
 		c.certDir, c.regularApiKey, c.regularId})
+	// gbj bin file
 	envoyExeDir := "/Users/geor7956/go/bin/"
 	cmd = exec.Command(envoyExeDir+"telemetry-envoy", "run", "--config="+configFileName)
 	cmd.Dir = c.dir
@@ -229,25 +228,26 @@ func initEnvoy(c config, releaseId string) (cmd *exec.Cmd) {
 		log.Fatal(err)
 	}
 
-	// give it time to start
-	// time.Sleep(10 * time.Second)
-	// if _, err = os.Stat(c.dir + "/data-telemetry-envoy"); err == nil {
-	// 	log.Fatal("installs incorrectly removed")
-	// }
-	// url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/agent-installs"
-	// installData := `{
-	// "agentReleaseId": "%s",
-	// "labelSelector": {
-	// 	"agent_discovered_os": "%s"
-	// }}`
 
-	// log.Println("gbj create install %s %s", url, fmt.Sprintf(installData, releaseId, runtime.GOOS))
-	// _ = doReq("POST", url, fmt.Sprintf(installData, releaseId, runtime.GOOS), "creating agent install", c.regularToken)
-	// // give it time to install
-	// time.Sleep(10 * time.Second)
-	// if _, err = os.Stat(c.dir + "/data-telemetry-envoy"); err != nil {
-	// 	log.Fatal("install failed")
-	// }
+	// give it time to start
+	time.Sleep(10 * time.Second)
+	if _, err = os.Stat(c.dir + "/data-telemetry-envoy"); err == nil {
+		log.Fatal("installs incorrectly removed")
+	}
+	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/agent-installs"
+	installData := `{
+	"agentReleaseId": "%s",
+        "labelSelectorMethod": "AND",
+	"labelSelector": {
+		"agent_discovered_os": "%s"
+	}}`
+
+	_ = doReq("POST", url, fmt.Sprintf(installData, releaseId, runtime.GOOS), "creating agent install", c.regularToken)
+	// give it time to install
+	time.Sleep(20 * time.Second)
+	if _, err = os.Stat(c.dir + "/data-telemetry-envoy"); err != nil {
+		log.Fatal("install failed")
+	}
 	log.Println("envoy started")
 	return cmd
 }
@@ -280,7 +280,6 @@ func getReleases(c config) string {
 	releaseData["darwin-amd64"] = darwinReleaseData
 
 	var ar AgentReleaseType
-	log.Println("gbj get: %s %s", c.agentReleaseUrl, c.regularToken)
 	arBody := doReq("GET", c.agentReleaseUrl, "", "getting all agent releases",
 		c.regularToken)
 	err := json.Unmarshal(arBody, &ar)
@@ -358,7 +357,6 @@ func deleteAgentInstalls(c config) {
 	checkErr(err, "unable to parse get agent installs response")
 	for _, i := range resp.Content {
 		// delete each install
-		log.Println("gbj deleting: " + url + i.ID)
 		_ = doReq("DELETE", url+i.ID, "", "deleting agent install "+i.ID, c.regularToken)
 
 	}
@@ -429,7 +427,7 @@ func createPrivateZone(c config) {
 
 var taskData = `{
 	"name": "%s",
-	"measurement": "http_response",
+	"measurement": "%s",
 	"taskParameters": {
 		"labelSelector": {
 			"agent_discovered_os": "%s"
@@ -465,8 +463,10 @@ func createTask(c config) {
 	}
 
 	// Now create new one
-	data := fmt.Sprintf(taskData, "net_response_task_"+c.id, runtime.GOOS)
-	_ = doReq("POST", url, data, "creating task", c.regularToken)
+	data := fmt.Sprintf(taskData, "net_response_task_"+c.id, "net_response", runtime.GOOS)
+	_ = doReq("POST", url, data, "creating net task", c.regularToken)
+	data = fmt.Sprintf(taskData, "http_response_task_"+c.id, "http_response", runtime.GOOS)
+	_ = doReq("POST", url, data, "creating http task", c.regularToken)
 
 }
 
@@ -478,7 +478,7 @@ func checkForEvents(c config, eventFound chan bool) {
 		r = kafka.NewReader(kafka.ReaderConfig{
 			Brokers:  c.kafkaBrokers,
 			Topic:    c.topic,
-			MinBytes: 1,    // 10KB
+			MinBytes: 1,    
 			MaxBytes: 10e6, // 10MB
 		})
 
@@ -513,7 +513,7 @@ func checkForEvents(c config, eventFound chan bool) {
 		r = kafka.NewReader(kafka.ReaderConfig{
 			Brokers:  c.kafkaBrokers,
 			Topic:    c.topic,
-			MinBytes: 1,    // 10KB
+			MinBytes: 1,
 			MaxBytes: 10e6, // 10MB
 			Dialer:   dialer,
 		})
@@ -590,14 +590,19 @@ func createMonitor(c config) {
 	data := fmt.Sprintf(netMonitorData, runtime.GOOS, c.privateZoneId, c.port)
 	_ = doReq("POST", url, data, "creating net monitor", c.regularToken)
 
-	//	adminUrl := c.adminApiUrl + "api/policy-monitors"
-	//	adminUrl := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/monitors/"
-	data = fmt.Sprintf(httpMonitorData, runtime.GOOS, c.privateZoneId, c.port)
-	//	_ = doReq("POST", adminUrl, data, "creating http monitor", c.adminToken)
+	adminUrl := c.adminApiUrl + "api/policy-monitors"
+	data = fmt.Sprintf(httpMonitorData, runtime.GOOS, c.publicZoneId, c.port)
+	_ = doReq("POST", adminUrl, data, "creating http monitor", c.adminToken)
 	log.Println("monitors created")
 
 }
 
+const monitorPolicyData = `{
+  "scope": "TENANT",
+  "subscope": "%s",
+  "name": "E2ET_%s",
+  "monitorId": "%s"
+}`
 func createPolicyMonitor(c config) {
 	// policy monitors require public pollers which local envs don't have
 	if c.env == "local" {
@@ -626,7 +631,13 @@ func createPolicyMonitor(c config) {
 
 	// Now create new policy monitor
 	data := fmt.Sprintf(httpMonitorData, runtime.GOOS, c.publicZoneId, c.port)
-	_ = doReq("POST", monitorUrl, data, "creating policy monitor", c.adminToken)
+	body := doReq("POST", monitorUrl, data, "creating policy monitor", c.adminToken)
+	var resp CreatePolicyMonitorResp
+	err := json.Unmarshal(body, &resp)
+	checkErr(err, "createing policy monitor")
+	// Now create new monitor policy
+	data = fmt.Sprintf(monitorPolicyData, c.tenantId, resp.ID, resp.ID)
+	_ = doReq("POST", policyUrl, data, "creating monitor policy", c.adminToken)
 
 }
 
