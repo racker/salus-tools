@@ -23,9 +23,9 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"github.com/satori/go.uuid"
 	"fmt"
 	"github.com/coreos/go-semver/semver"
-	"github.com/satori/go.uuid"
 	"github.com/segmentio/kafka-go"
 	"runtime"
 	"html/template"
@@ -38,32 +38,8 @@ import (
 	"time"
 	"context"
 	"github.com/spf13/viper"
-	//"flag"
+	"flag"
 )
-
-type LabelsType = struct {
-	AgentDiscoveredArch string `json:"agent_discovered_arch"`
-	AgentDiscoveredOs   string `json:"agent_discovered_os"`
-}
-type agentReleaseEntry = struct {
-	Id      string
-	ArType  string `json:"type"`
-	Version string
-	Labels  LabelsType
-	Url     string
-	Exe     string
-}
-type agentReleaseType = struct {
-	Content []agentReleaseEntry
-}
-
-type TemplateFields = struct {
-	ResourceId    string
-	PrivateZoneID string
-	CertDir       string
-	ApiKey        string
-	RegularId        string
-}
 
 var localConfigTemplate = `resource_id: {{.ResourceId}}
 zone: {{.PrivateZoneID}}
@@ -101,33 +77,6 @@ ambassador:
 agents:
   dataPath: data-telemetry-envoy
 `
-type config = struct {
-	env string
-	currentUUID     uuid.UUID
-	id              string
-	privateZoneId   string
-	resourceId      string
-	tenantId        string
-	regularId       string
-	adminId       string
-	publicApiUrl    string
-	adminApiUrl		string
-	agentReleaseUrl string
-	certDir         string
-	regularToken    string
-	adminToken		string
-	dir             string
-	kafkaBrokers    []string
-	topic           string
-	port            string
-	certFile string
-	keyFile string
-	caFile string
-	regularApiKey string
-	adminApiKey string
-	adminPassword string
-	publicZoneId string
-}
 
 func initConfig() config {
 	replacer := strings.NewReplacer(".", "_", "-", "_")
@@ -135,13 +84,14 @@ func initConfig() config {
 	viper.SetEnvPrefix("E2ET")
 	viper.AutomaticEnv() // read in environment variables that match
 
-	//cfgFile := flag.String("cfgFile", "config.yml", "config file")
-	cfgFile := "/Users/geor7956/incoming/s4/salus-telemetry-bundle/tools/go/config.dev.yml"
-	viper.SetConfigFile(cfgFile)
+	cfgFile := flag.String("config", "config.yml", "config file")
+//	cfgFile := "/Users/geor7956/incoming/s4/salus-telemetry-bundle/tools/go/config.dev.yml"
+        flag.Parse()
+	viper.SetConfigFile(*cfgFile)
 	if err := viper.ReadInConfig(); err == nil {
-		log.Println("loaded: " + cfgFile)
+		log.Println("loaded: " + *cfgFile)
 	} else {
-		log.Fatal("Config file not found" + cfgFile)
+		log.Fatal("Config file not found " + *cfgFile)
 	}
 	var c config
 	c.env = viper.GetString("env")
@@ -195,44 +145,7 @@ const pwTokenData =
     }
 }`
 
-type IdentityResp struct {
-	Access struct {
-		ServiceCatalog []struct {
-			Endpoints []struct {
-				TenantID  string `json:"tenantId"`
-				PublicURL string `json:"publicURL"`
-				Region    string `json:"region"`
-			} `json:"endpoints"`
-			Name string `json:"name"`
-			Type string `json:"type"`
-		} `json:"serviceCatalog"`
-		User struct {
-			RAXAUTHSessionInactivityTimeout string `json:"RAX-AUTH:sessionInactivityTimeout"`
-			RAXAUTHDefaultRegion            string `json:"RAX-AUTH:defaultRegion"`
-			Roles                           []struct {
-				Name        string `json:"name"`
-				TenantID    string `json:"tenantId,omitempty"`
-				Description string `json:"description"`
-				ID          string `json:"id"`
-			} `json:"roles"`
-			RAXAUTHPhonePin      string `json:"RAX-AUTH:phonePin"`
-			Name                 string `json:"name"`
-			ID                   string `json:"id"`
-			RAXAUTHDomainID      string `json:"RAX-AUTH:domainId"`
-			RAXAUTHPhonePinState string `json:"RAX-AUTH:phonePinState"`
-		} `json:"user"`
-		Token struct {
-			Expires                time.Time `json:"expires"`
-			RAXAUTHIssued          time.Time `json:"RAX-AUTH:issued"`
-			RAXAUTHAuthenticatedBy []string  `json:"RAX-AUTH:authenticatedBy"`
-			ID                     string    `json:"id"`
-			Tenant                 struct {
-				Name string `json:"name"`
-				ID   string `json:"id"`
-			} `json:"tenant"`
-		} `json:"token"`
-	} `json:"access"`
-}
+
 func getToken(user string, apiKey string, pw string) (string) {
 	if user == "" {
 		return ""
@@ -257,6 +170,7 @@ func checkErr(err error, message string) {
 }
 
 func main() {
+	log.Println("Starting e2et")
 	c := initConfig()
 	fmt.Println("gbjdir: " + c.dir)
 
@@ -359,33 +273,21 @@ var linuxReleaseData =
   "url": "https://homebrew.bintray.com/bottles/telegraf-1.11.0.high_sierra.bottle.tar.gz",
   "exe": "telegraf/1.11.0/bin/telegraf"
 }`
-type AgentReleaseCreateResp struct {
-	ID      string `json:"id"`
-	Type    string `json:"type"`
-	Version string `json:"version"`
-	Labels  struct {
-		AgentDiscoveredOs   string `json:"agent_discovered_os"`
-		AgentDiscoveredArch string `json:"agent_discovered_arch"`
-	} `json:"labels"`
-	URL              string    `json:"url"`
-	Exe              string    `json:"exe"`
-	CreatedTimestamp time.Time `json:"createdTimestamp"`
-	UpdatedTimestamp time.Time `json:"updatedTimestamp"`
-}
+
 
 func getReleases(c config) string {
 	releaseData := make(map[string]string)
 	releaseData["linux-amd64"] = linuxReleaseData
 	releaseData["darwin-amd64"] = darwinReleaseData
 
-	var ar agentReleaseType
+	var ar AgentReleaseType
 	log.Println("gbj get: %s %s", c.agentReleaseUrl, c.regularToken)
 	arBody := doReq("GET", c.agentReleaseUrl, "", "getting all agent releases",
 		c.regularToken)
 	err := json.Unmarshal(arBody, &ar)
 	checkErr(err, "unable to parse agent release response")
 	// get the latest matching release
-	var entry agentReleaseEntry
+	var entry AgentReleaseEntry
 	entry.Version = "0.0.0"
 	for _, r := range ar.Content {
 		if r.Labels.AgentDiscoveredArch == runtime.GOARCH &&
@@ -445,34 +347,7 @@ func doReq(method string, url string, data string, errMessage string, token stri
 
 		return body
 }
-type GetAgentInstallsResp struct {
-	Content []struct {
-		ID           string `json:"id"`
-		AgentRelease struct {
-			ID      string `json:"id"`
-			Type    string `json:"type"`
-			Version string `json:"version"`
-			Labels  struct {
-				AgentDiscoveredArch string `json:"agent_discovered_arch"`
-				AgentDiscoveredOs   string `json:"agent_discovered_os"`
-			} `json:"labels"`
-			URL              string    `json:"url"`
-			Exe              string    `json:"exe"`
-			CreatedTimestamp time.Time `json:"createdTimestamp"`
-			UpdatedTimestamp time.Time `json:"updatedTimestamp"`
-		} `json:"agentRelease"`
-		LabelSelector struct {
-			AgentDiscoveredOs string `json:"agent_discovered_os"`
-		} `json:"labelSelector"`
-		CreatedTimestamp time.Time `json:"createdTimestamp"`
-		UpdatedTimestamp time.Time `json:"updatedTimestamp"`
-	} `json:"content"`
-	Number        int  `json:"number"`
-	TotalPages    int  `json:"totalPages"`
-	TotalElements int  `json:"totalElements"`
-	Last          bool `json:"last"`
-	First         bool `json:"first"`
-}
+
 func deleteAgentInstalls(c config) {
 	log.Println("deleting AgentInstalls")
 		url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/agent-installs/"
@@ -489,28 +364,7 @@ func deleteAgentInstalls(c config) {
 		}
 	}
 
-type GetResourcesResp struct {
-	Content []struct {
-		TenantID   string `json:"tenantId"`
-		ResourceID string `json:"resourceId"`
-		Labels     struct {
-			AgentDiscoveredArch     string `json:"agent_discovered_arch"`
-			AgentDiscoveredHostname string `json:"agent_discovered_hostname"`
-			AgentEnvironment        string `json:"agent_environment"`
-			AgentDiscoveredOs       string `json:"agent_discovered_os"`
-		} `json:"labels"`
-		Metadata                  interface{} `json:"metadata"`
-		PresenceMonitoringEnabled bool        `json:"presenceMonitoringEnabled"`
-		AssociatedWithEnvoy       bool        `json:"associatedWithEnvoy"`
-		CreatedTimestamp          time.Time   `json:"createdTimestamp"`
-		UpdatedTimestamp          time.Time   `json:"updatedTimestamp"`
-	} `json:"content"`
-	Number        int  `json:"number"`
-	TotalPages    int  `json:"totalPages"`
-	TotalElements int  `json:"totalElements"`
-	Last          bool `json:"last"`
-	First         bool `json:"first"`
-}
+
 func deleteResources(c config) {
 	log.Println("deleting Resources")
 	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/resources/"
@@ -527,43 +381,6 @@ func deleteResources(c config) {
 	}
 }
 
-
-type GetZonesResp struct {
-	Content []struct {
-		Name              string        `json:"name"`
-		PollerTimeout     int           `json:"pollerTimeout"`
-		Provider          interface{}   `json:"provider"`
-		ProviderRegion    interface{}   `json:"providerRegion"`
-		SourceIPAddresses []interface{} `json:"sourceIpAddresses"`
-		CreatedTimestamp  time.Time     `json:"createdTimestamp"`
-		UpdatedTimestamp  time.Time     `json:"updatedTimestamp"`
-		Public            bool          `json:"public"`
-	} `json:"content"`
-	Number        int  `json:"number"`
-	TotalPages    int  `json:"totalPages"`
-	TotalElements int  `json:"totalElements"`
-	Last          bool `json:"last"`
-	First         bool `json:"first"`
-}
-type GetMonitorsResp struct {
-	Content []struct {
-		ID            string      `json:"id"`
-		Name          interface{} `json:"name"`
-		LabelSelector struct {
-			AgentDiscoveredOs string `json:"agent_discovered_os"`
-		} `json:"labelSelector"`
-		LabelSelectorMethod string      `json:"labelSelectorMethod"`
-		ResourceID          interface{} `json:"resourceId"`
-		Interval            string      `json:"interval"`
-		CreatedTimestamp time.Time `json:"createdTimestamp"`
-		UpdatedTimestamp time.Time `json:"updatedTimestamp"`
-	} `json:"content"`
-	Number        int  `json:"number"`
-	TotalPages    int  `json:"totalPages"`
-	TotalElements int  `json:"totalElements"`
-	Last          bool `json:"last"`
-	First         bool `json:"first"`
-}
 
 func deleteMonitors(c config) {
 	log.Println("deleting Monitors")
@@ -631,39 +448,7 @@ var taskData =
 	}
 }`
 
-type GetTasksResp struct {
-	Content []struct {
-		ID             string `json:"id"`
-		Name           string `json:"name"`
-		Measurement    string `json:"measurement"`
-		TaskParameters struct {
-			Info     interface{} `json:"info"`
-			Warning  interface{} `json:"warning"`
-			Critical struct {
-				Expression struct {
-					Field      string `json:"field"`
-					Threshold  int    `json:"threshold"`
-					Comparator string `json:"comparator"`
-				} `json:"expression"`
-				ConsecutiveCount int `json:"consecutiveCount"`
-			} `json:"critical"`
-			EvalExpressions   interface{} `json:"evalExpressions"`
-			WindowLength      interface{} `json:"windowLength"`
-			WindowFields      interface{} `json:"windowFields"`
-			FlappingDetection bool        `json:"flappingDetection"`
-			LabelSelector     struct {
-				AgentEnvironment string `json:"agent_environment"`
-			} `json:"labelSelector"`
-		} `json:"taskParameters"`
-		CreatedTimestamp time.Time `json:"createdTimestamp"`
-		UpdatedTimestamp time.Time `json:"updatedTimestamp"`
-	} `json:"content"`
-	Number        int  `json:"number"`
-	TotalPages    int  `json:"totalPages"`
-	TotalElements int  `json:"totalElements"`
-	Last          bool `json:"last"`
-	First         bool `json:"first"`
-}
+
 func createTask(c config) {
 	log.Println("deleting Tasks")
 	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/event-tasks/"
@@ -800,22 +585,6 @@ func createMonitor(c config ) {
 
 }
 
-type GetPoliciesResp  struct {
-	Content []struct {
-		ID               string    `json:"id"`
-		Scope            string    `json:"scope"`
-		Subscope         string    `json:"subscope"`
-		CreatedTimestamp time.Time `json:"createdTimestamp"`
-		UpdatedTimestamp time.Time `json:"updatedTimestamp"`
-		Name             string    `json:"name"`
-		MonitorID        string    `json:"monitorId"`
-	} `json:"content"`
-	Number        int  `json:"number"`
-	TotalPages    int  `json:"totalPages"`
-	TotalElements int  `json:"totalElements"`
-	Last          bool `json:"last"`
-	First         bool `json:"first"`
-}
 func createPolicyMonitor(c config) {
 	// policy monitors require public pollers which local envs don't have
 	if c.env == "local" {
