@@ -20,25 +20,25 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
-	"github.com/satori/go.uuid"
+	"flag"
 	"fmt"
 	"github.com/coreos/go-semver/semver"
+	"github.com/satori/go.uuid"
 	"github.com/segmentio/kafka-go"
-	"runtime"
+	"github.com/spf13/viper"
 	"html/template"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"time"
-	"context"
-	"github.com/spf13/viper"
-	"flag"
 )
 
 var localConfigTemplate = `resource_id: {{.ResourceId}}
@@ -61,8 +61,7 @@ ingest:
 agents:
   dataPath: data-telemetry-envoy
 `
-var remoteConfigTemplate =
-	`resource_id: "{{.ResourceId }}"
+var remoteConfigTemplate = `resource_id: "{{.ResourceId }}"
 zone: {{.PrivateZoneID}}
 tls:
   auth_service:
@@ -85,8 +84,8 @@ func initConfig() config {
 	viper.AutomaticEnv() // read in environment variables that match
 
 	cfgFile := flag.String("config", "config.yml", "config file")
-//	cfgFile := "/Users/geor7956/incoming/s4/salus-telemetry-bundle/tools/go/config.dev.yml"
-        flag.Parse()
+	//	cfgFile := "/Users/geor7956/incoming/s4/salus-telemetry-bundle/tools/go/config.dev.yml"
+	flag.Parse()
 	viper.SetConfigFile(*cfgFile)
 	if err := viper.ReadInConfig(); err == nil {
 		log.Println("loaded: " + *cfgFile)
@@ -126,17 +125,14 @@ func initConfig() config {
 	return c
 }
 
-
-const apiTokenData =
-	`{
+const apiTokenData = `{
     "auth": {
        "RAX-KSKEY:apiKeyCredentials": {  
           "username": "%s",  
           "apiKey": "%s"}
     }  
 }`
-const pwTokenData =
-	`{
+const pwTokenData = `{
    "auth": {
        "passwordCredentials": {
           "username":"%s",
@@ -145,8 +141,7 @@ const pwTokenData =
     }
 }`
 
-
-func getToken(user string, apiKey string, pw string) (string) {
+func getToken(user string, apiKey string, pw string) string {
 	if user == "" {
 		return ""
 	}
@@ -158,7 +153,7 @@ func getToken(user string, apiKey string, pw string) (string) {
 		tokenData = fmt.Sprintf(apiTokenData, user, apiKey)
 	}
 	var resp IdentityResp
-	body := doReq("POST", url, tokenData, "getting token for : " + user, "")
+	body := doReq("POST", url, tokenData, "getting token for : "+user, "")
 	err := json.Unmarshal(body, &resp)
 	checkErr(err, "unable to parse identity response")
 	return resp.Access.Token.ID
@@ -180,21 +175,21 @@ func main() {
 	deleteResources(c)
 	deleteMonitors(c)
 	createPrivateZone(c)
-	
+
 	cmd := initEnvoy(c, releaseId)
 	defer cmd.Process.Kill()
 	createTask(c)
 	eventFound := make(chan bool, 1)
 	go checkForEvents(c, eventFound)
 	createMonitor(c)
-//	createPolicyMonitor(c)
-//	checkPresenceMonitor(c)
-    select {
-    case <-eventFound:
-	    log.Println("events returned from kafka successfully")
-    case <-time.After(5 * time.Minute):
-        log.Fatal("Timed out waiting for events")
-    }
+	//	createPolicyMonitor(c)
+	//	checkPresenceMonitor(c)
+	select {
+	case <-eventFound:
+		log.Println("events returned from kafka successfully")
+	case <-time.After(5 * time.Minute):
+		log.Fatal("Timed out waiting for events")
+	}
 
 }
 
@@ -206,7 +201,7 @@ func initEnvoy(c config, releaseId string) (cmd *exec.Cmd) {
 		log.Fatal(err)
 	}
 	var configTemplate string
-	if (c.env == "local") {
+	if c.env == "local" {
 		configTemplate = localConfigTemplate
 	} else {
 		configTemplate = remoteConfigTemplate
@@ -256,8 +251,8 @@ func initEnvoy(c config, releaseId string) (cmd *exec.Cmd) {
 	log.Println("envoy started")
 	return cmd
 }
-var linuxReleaseData =
-	`{
+
+var linuxReleaseData = `{
   "type": "TELEGRAF",
   "version": "1.11.0",
   "labels": {
@@ -268,8 +263,7 @@ var linuxReleaseData =
   "exe": "./telegraf/telegraf"
 }
 `
-	var darwinReleaseData =
-	`{
+var darwinReleaseData = `{
   "type": "TELEGRAF",
   "version": "1.11.0",
   "labels": {
@@ -279,7 +273,6 @@ var linuxReleaseData =
   "url": "https://homebrew.bintray.com/bottles/telegraf-1.11.0.high_sierra.bottle.tar.gz",
   "exe": "telegraf/1.11.0/bin/telegraf"
 }`
-
 
 func getReleases(c config) string {
 	releaseData := make(map[string]string)
@@ -305,21 +298,21 @@ func getReleases(c config) string {
 	}
 	//create release if none exists
 	if entry.Version == "0.0.0" {
-		releaseBody, ok := releaseData[runtime.GOOS + "-" + runtime.GOARCH]
+		releaseBody, ok := releaseData[runtime.GOOS+"-"+runtime.GOARCH]
 		if !ok {
 			log.Fatal("no valid release found for this arch")
 		}
-		newArBody := doReq("POST",  c.adminApiUrl + "api/agent-releases",
+		newArBody := doReq("POST", c.adminApiUrl+"api/agent-releases",
 			releaseBody, "creating new agent release", c.adminToken)
 
 		createResp := new(AgentReleaseCreateResp)
 		err = json.Unmarshal(newArBody, createResp)
 		checkErr(err, "unable to parse create response")
 		return createResp.ID
-		} else {
-			return entry.Id
+	} else {
+		return entry.Id
 	}
-	
+
 }
 
 const curlOutput = `
@@ -329,47 +322,47 @@ curl %s  \
     -H "Content-type: application/json" \
     -H "x-auth-token: %s"
 `
-func doReq(method string, url string, data string, errMessage string, token string) ([]byte){
+
+func doReq(method string, url string, data string, errMessage string, token string) []byte {
 	if !strings.Contains(data, "username") {
 		log.Printf("Running equivalent curl:\n %s",
-		fmt.Sprintf(curlOutput, url, method, strings.Replace(data, "\n", "", -1), token))
+			fmt.Sprintf(curlOutput, url, method, strings.Replace(data, "\n", "", -1), token))
 
 	}
-		req, err := http.NewRequest(method, url, bytes.NewBuffer([]byte(data)))
-		checkErr(err, "request create failed: " + errMessage)
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("x-auth-token", token)
-		// Do the request
-		client := &http.Client{}
-		resp, err := client.Do(req)
-		checkErr(err, "client create failed: " + errMessage)
-		defer resp.Body.Close()
-		body, err := ioutil.ReadAll(resp.Body)
-		checkErr(err, "unable read response body: " + errMessage)
-		if resp.StatusCode/100 != 2 {
-			log.Println(errMessage + ": " + string(body))
-			log.Fatal("status code: " + resp.Status)
-		}
+	req, err := http.NewRequest(method, url, bytes.NewBuffer([]byte(data)))
+	checkErr(err, "request create failed: "+errMessage)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-auth-token", token)
+	// Do the request
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	checkErr(err, "client create failed: "+errMessage)
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	checkErr(err, "unable read response body: "+errMessage)
+	if resp.StatusCode/100 != 2 {
+		log.Println(errMessage + ": " + string(body))
+		log.Fatal("status code: " + resp.Status)
+	}
 
-		return body
+	return body
 }
 
 func deleteAgentInstalls(c config) {
 	log.Println("deleting AgentInstalls")
-		url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/agent-installs/"
-		installBody := doReq("GET", url,
+	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/agent-installs/"
+	installBody := doReq("GET", url,
 		"", "getting all agent installs", c.regularToken)
-		var resp GetAgentInstallsResp
-		err := json.Unmarshal(installBody, &resp)
-		checkErr(err, "unable to parse get agent installs response")
-		for _, i := range resp.Content {
-			// delete each install
-			log.Println("gbj deleting: " + url +i.ID)
-			_ = doReq("DELETE", url + i.ID, "", "deleting agent install " + i.ID, c.regularToken)
+	var resp GetAgentInstallsResp
+	err := json.Unmarshal(installBody, &resp)
+	checkErr(err, "unable to parse get agent installs response")
+	for _, i := range resp.Content {
+		// delete each install
+		log.Println("gbj deleting: " + url + i.ID)
+		_ = doReq("DELETE", url+i.ID, "", "deleting agent install "+i.ID, c.regularToken)
 
-		}
 	}
-
+}
 
 func deleteResources(c config) {
 	log.Println("deleting Resources")
@@ -382,11 +375,10 @@ func deleteResources(c config) {
 	for _, i := range resp.Content {
 		log.Println("delete resource: " + i.ResourceID)
 		// delete each resource
-		_ = doReq("DELETE", url + i.ResourceID, "", "deleting resource " + i.ResourceID, c.regularToken)
+		_ = doReq("DELETE", url+i.ResourceID, "", "deleting resource "+i.ResourceID, c.regularToken)
 
 	}
 }
-
 
 func deleteMonitors(c config) {
 	log.Println("deleting Monitors")
@@ -399,7 +391,7 @@ func deleteMonitors(c config) {
 		checkErr(err, "unable to parse get monitors response")
 		for _, i := range resp.Content {
 			// delete each monitor
-			_ = doReq("DELETE", url + i.ID, "", "deleting monitor " + i.ID, c.regularToken)
+			_ = doReq("DELETE", url+i.ID, "", "deleting monitor "+i.ID, c.regularToken)
 
 		}
 		if resp.Last {
@@ -420,7 +412,7 @@ func createPrivateZone(c config) {
 		for _, i := range resp.Content {
 			// delete each zone
 			if strings.Index(i.Name, "public/") != 0 {
-				_ = doReq("DELETE", url + i.Name, "", "deleting zone " + i.Name, c.regularToken)
+				_ = doReq("DELETE", url+i.Name, "", "deleting zone "+i.Name, c.regularToken)
 			}
 		}
 		if resp.Last {
@@ -432,11 +424,10 @@ func createPrivateZone(c config) {
 	message := `{"name": "` + c.privateZoneId + `"}`
 	log.Println("creating zone: %s %s", url, message)
 	_ = doReq("POST", url, message, "creating private zone", c.regularToken)
-	
+
 }
 
-var taskData =
-	`{
+var taskData = `{
 	"name": "%s",
 	"measurement": "http_response",
 	"taskParameters": {
@@ -454,7 +445,6 @@ var taskData =
 	}
 }`
 
-
 func createTask(c config) {
 	log.Println("deleting Tasks")
 	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/event-tasks/"
@@ -466,7 +456,7 @@ func createTask(c config) {
 		checkErr(err, "unable to parse get tasks response")
 		for _, i := range resp.Content {
 			// delete each task
-			_ = doReq("DELETE", url + i.ID, "", "deleting tasks " + i.ID, c.regularToken)
+			_ = doReq("DELETE", url+i.ID, "", "deleting tasks "+i.ID, c.regularToken)
 
 		}
 		if resp.Last {
@@ -475,16 +465,16 @@ func createTask(c config) {
 	}
 
 	// Now create new one
-	data := fmt.Sprintf(taskData, "net_response_task_" + c.id, runtime.GOOS)
+	data := fmt.Sprintf(taskData, "net_response_task_"+c.id, runtime.GOOS)
 	_ = doReq("POST", url, data, "creating task", c.regularToken)
-	
+
 }
 
 func checkForEvents(c config, eventFound chan bool) {
 	var r *kafka.Reader
 	finishedMap := make(map[string]bool)
 	finishedMap["net"] = false
-	if (c.env == "local") {
+	if c.env == "local" {
 		r = kafka.NewReader(kafka.ReaderConfig{
 			Brokers:  c.kafkaBrokers,
 			Topic:    c.topic,
@@ -537,7 +527,7 @@ func checkForEvents(c config, eventFound chan bool) {
 		log.Printf("message at topic/partition/offset %v/%v/%v: %s = %s\n", m.Topic, m.Partition, m.Offset, string(m.Key), string(m.Value))
 		s := string(m.Value)
 		if strings.Contains(s, c.resourceId) {
-			if strings.Contains(s,"net_response") {
+			if strings.Contains(s, "net_response") {
 				finishedMap["net"] = true
 			}
 			if strings.Contains(s, "http_response") {
@@ -558,11 +548,10 @@ func checkForEvents(c config, eventFound chan bool) {
 	}
 
 	r.Close()
-	
+
 }
 
-var netMonitorData =
-	`{
+var netMonitorData = `{
   "labelSelector": {
     "agent_discovered_os": "%s"
   },
@@ -577,8 +566,7 @@ var netMonitorData =
     }
   }
 }`
-var httpMonitorData =
-	`{
+var httpMonitorData = `{
   "labelSelector": {
     "agent_discovered_os": "%s"
   },
@@ -594,17 +582,18 @@ var httpMonitorData =
     }
   }
 }`
-func createMonitor(c config ) {
+
+func createMonitor(c config) {
 	log.Println("creating Monitors")
-	
+
 	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/monitors/"
 	data := fmt.Sprintf(netMonitorData, runtime.GOOS, c.privateZoneId, c.port)
 	_ = doReq("POST", url, data, "creating net monitor", c.regularToken)
 
-//	adminUrl := c.adminApiUrl + "api/policy-monitors"
-//	adminUrl := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/monitors/"
+	//	adminUrl := c.adminApiUrl + "api/policy-monitors"
+	//	adminUrl := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/monitors/"
 	data = fmt.Sprintf(httpMonitorData, runtime.GOOS, c.privateZoneId, c.port)
-//	_ = doReq("POST", adminUrl, data, "creating http monitor", c.adminToken)
+	//	_ = doReq("POST", adminUrl, data, "creating http monitor", c.adminToken)
 	log.Println("monitors created")
 
 }
@@ -612,12 +601,12 @@ func createMonitor(c config ) {
 func createPolicyMonitor(c config) {
 	// policy monitors require public pollers which local envs don't have
 	if c.env == "local" {
-	    return
+		return
 	}
 	log.Println("deleting policy monitors")
 	policyUrl := c.adminApiUrl + "api/policies/monitors/"
 	monitorUrl := c.adminApiUrl + "api/policy-monitors/"
-	
+
 	for {
 		body := doReq("GET", policyUrl,
 			"", "getting all policy monitors", c.adminToken)
@@ -626,9 +615,9 @@ func createPolicyMonitor(c config) {
 		checkErr(err, "unable to parse get policy monitor response")
 		for _, i := range resp.Content {
 			// delete each policy
-			_ = doReq("DELETE", policyUrl + i.ID, "", "deleting policy " + i.ID, c.adminToken)
+			_ = doReq("DELETE", policyUrl+i.ID, "", "deleting policy "+i.ID, c.adminToken)
 			// delete the corresponding monitor
-			_ = doReq("DELETE", monitorUrl + i.MonitorID, "", "deleting policy monitor " + i.MonitorID, c.adminToken)
+			_ = doReq("DELETE", monitorUrl+i.MonitorID, "", "deleting policy monitor "+i.MonitorID, c.adminToken)
 		}
 		if resp.Last {
 			break
@@ -638,7 +627,7 @@ func createPolicyMonitor(c config) {
 	// Now create new policy monitor
 	data := fmt.Sprintf(httpMonitorData, runtime.GOOS, c.publicZoneId, c.port)
 	_ = doReq("POST", monitorUrl, data, "creating policy monitor", c.adminToken)
-	
+
 }
 
 func checkPresenceMonitor(c config) {

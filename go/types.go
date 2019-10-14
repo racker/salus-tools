@@ -1,9 +1,9 @@
 package main
-import (
-	"time"
-	"github.com/satori/go.uuid"
-)
 
+import (
+	"github.com/satori/go.uuid"
+	"time"
+)
 
 type LabelsType = struct {
 	AgentDiscoveredArch string `json:"agent_discovered_arch"`
@@ -29,31 +29,31 @@ type TemplateFields = struct {
 	RegularId     string
 }
 type config = struct {
-	env string
+	env             string
 	currentUUID     uuid.UUID
 	id              string
 	privateZoneId   string
 	resourceId      string
 	tenantId        string
 	regularId       string
-	adminId       string
+	adminId         string
 	publicApiUrl    string
-	adminApiUrl		string
+	adminApiUrl     string
 	agentReleaseUrl string
 	certDir         string
 	regularToken    string
-	adminToken		string
+	adminToken      string
 	dir             string
 	kafkaBrokers    []string
 	topic           string
 	port            string
-	certFile string
-	keyFile string
-	caFile string
-	regularApiKey string
-	adminApiKey string
-	adminPassword string
-	publicZoneId string
+	certFile        string
+	keyFile         string
+	caFile          string
+	regularApiKey   string
+	adminApiKey     string
+	adminPassword   string
+	publicZoneId    string
 }
 
 type IdentityResp struct {
@@ -185,8 +185,8 @@ type GetMonitorsResp struct {
 		LabelSelectorMethod string      `json:"labelSelectorMethod"`
 		ResourceID          interface{} `json:"resourceId"`
 		Interval            string      `json:"interval"`
-		CreatedTimestamp time.Time `json:"createdTimestamp"`
-		UpdatedTimestamp time.Time `json:"updatedTimestamp"`
+		CreatedTimestamp    time.Time   `json:"createdTimestamp"`
+		UpdatedTimestamp    time.Time   `json:"updatedTimestamp"`
 	} `json:"content"`
 	Number        int  `json:"number"`
 	TotalPages    int  `json:"totalPages"`
@@ -229,7 +229,7 @@ type GetTasksResp struct {
 	First         bool `json:"first"`
 }
 
-type GetPoliciesResp  struct {
+type GetPoliciesResp struct {
 	Content []struct {
 		ID               string    `json:"id"`
 		Scope            string    `json:"scope"`
