@@ -188,7 +188,13 @@ func main() {
 	go checkForEvents(c, eventFound)
 	createMonitor(c)
 //	createPolicyMonitor(c)
-	<-eventFound
+//	checkPresenceMonitor(c)
+    select {
+    case <-eventFound:
+	    log.Println("events returned from kafka successfully")
+    case <-time.After(5 * time.Minute):
+        log.Fatal("Timed out waiting for events")
+    }
 
 }
 
@@ -476,8 +482,9 @@ func createTask(c config) {
 
 func checkForEvents(c config, eventFound chan bool) {
 	var r *kafka.Reader
+	finishedMap := make(map[string]bool)
+	finishedMap["net"] = false
 	if (c.env == "local") {
-
 		r = kafka.NewReader(kafka.ReaderConfig{
 			Brokers:  c.kafkaBrokers,
 			Topic:    c.topic,
@@ -486,6 +493,7 @@ func checkForEvents(c config, eventFound chan bool) {
 		})
 
 	} else {
+		finishedMap["http"] = false
 		// Load client cert
 		cert, err := tls.LoadX509KeyPair(c.certFile, c.keyFile)
 		if err != nil {
@@ -529,7 +537,23 @@ func checkForEvents(c config, eventFound chan bool) {
 		log.Printf("message at topic/partition/offset %v/%v/%v: %s = %s\n", m.Topic, m.Partition, m.Offset, string(m.Key), string(m.Value))
 		s := string(m.Value)
 		if strings.Contains(s, c.resourceId) {
-//GBJFIX			eventFound <- true
+			if strings.Contains(s,"net_response") {
+				finishedMap["net"] = true
+			}
+			if strings.Contains(s, "http_response") {
+				finishedMap["http"] = true
+			}
+			var allFinished bool
+			for _, b := range finishedMap {
+				allFinished = b
+				if !allFinished {
+					break
+				}
+			}
+
+			if allFinished {
+				<-eventFound
+			}
 		}
 	}
 
@@ -602,7 +626,7 @@ func createPolicyMonitor(c config) {
 		checkErr(err, "unable to parse get policy monitor response")
 		for _, i := range resp.Content {
 			// delete each policy
-// gbj why failing?			_ = doReq("DELETE", policyUrl + i.ID, "", "deleting policy " + i.ID, c.adminToken)
+			_ = doReq("DELETE", policyUrl + i.ID, "", "deleting policy " + i.ID, c.adminToken)
 			// delete the corresponding monitor
 			_ = doReq("DELETE", monitorUrl + i.MonitorID, "", "deleting policy monitor " + i.MonitorID, c.adminToken)
 		}
@@ -615,4 +639,10 @@ func createPolicyMonitor(c config) {
 	data := fmt.Sprintf(httpMonitorData, runtime.GOOS, c.publicZoneId, c.port)
 	_ = doReq("POST", monitorUrl, data, "creating policy monitor", c.adminToken)
 	
+}
+
+func checkPresenceMonitor(c config) {
+	url := c.adminApiUrl + "api/presence-monitor/partitions/"
+	_ = doReq("GET", url, "", "getting presence monitor partitions", c.adminToken)
+	log.Println("got presence monitor partitions")
 }
