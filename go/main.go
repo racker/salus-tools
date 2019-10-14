@@ -126,6 +126,7 @@ type config = struct {
 	regularApiKey string
 	adminApiKey string
 	adminPassword string
+	publicZoneId string
 }
 
 func initConfig() config {
@@ -163,6 +164,7 @@ func initConfig() config {
 	c.topic = viper.GetString("topic")
 	//gbj pick port dynamically
 	c.port = "8222"
+	c.publicZoneId = "public/us_central_1"
 	c.certFile = viper.GetString("certFile")
 	c.keyFile = viper.GetString("keyFile")
 	c.caFile = viper.GetString("caFile")
@@ -271,6 +273,7 @@ func main() {
 	eventFound := make(chan bool, 1)
 	go checkForEvents(c, eventFound)
 	createMonitor(c)
+//	createPolicyMonitor(c)
 	<-eventFound
 
 }
@@ -419,8 +422,11 @@ curl %s  \
     -H "x-auth-token: %s"
 `
 func doReq(method string, url string, data string, errMessage string, token string) ([]byte){
-//	log.Printf("Running equivalent curl:\n %s",
-//		fmt.Sprintf(curlOutput, url, method, strings.Replace(data, "\n", "", -1), token))
+	if !strings.Contains(data, "username") {
+		log.Printf("Running equivalent curl:\n %s",
+		fmt.Sprintf(curlOutput, url, method, strings.Replace(data, "\n", "", -1), token))
+
+	}
 		req, err := http.NewRequest(method, url, bytes.NewBuffer([]byte(data)))
 		checkErr(err, "request create failed: " + errMessage)
 		req.Header.Set("Content-Type", "application/json")
@@ -609,7 +615,7 @@ func createPrivateZone(c config) {
 var taskData =
 	`{
 	"name": "%s",
-	"measurement": "net_response",
+	"measurement": "http_response",
 	"taskParameters": {
 		"labelSelector": {
 			"agent_discovered_os": "%s"
@@ -773,7 +779,7 @@ var httpMonitorData =
     "monitoringZones": ["%s"],
     "plugin": {
       "type": "http_response",
-      "address": "http://localhost:%s",
+      "address": "http://georgejahad:%s",
       "responseTimeout": "3s",
       "method": "GET"
     }
@@ -782,14 +788,62 @@ var httpMonitorData =
 func createMonitor(c config ) {
 	log.Println("creating Monitors")
 	
-	// url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/monitors/"
-	// data := fmt.Sprintf(netMonitorData, runtime.GOOS, c.privateZoneId, c.port)
-	// _ = doReq("POST", url, data, "creating net monitor", c.regularToken)
+	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/monitors/"
+	data := fmt.Sprintf(netMonitorData, runtime.GOOS, c.privateZoneId, c.port)
+	_ = doReq("POST", url, data, "creating net monitor", c.regularToken)
 
 //	adminUrl := c.adminApiUrl + "api/policy-monitors"
-	adminUrl := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/monitors/"
-	data := fmt.Sprintf(httpMonitorData, runtime.GOOS, c.privateZoneId, c.port)
-	_ = doReq("POST", adminUrl, data, "creating http monitor", c.regularToken)
+//	adminUrl := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/monitors/"
+	data = fmt.Sprintf(httpMonitorData, runtime.GOOS, c.privateZoneId, c.port)
+//	_ = doReq("POST", adminUrl, data, "creating http monitor", c.adminToken)
 	log.Println("monitors created")
 
+}
+
+type GetPoliciesResp  struct {
+	Content []struct {
+		ID               string    `json:"id"`
+		Scope            string    `json:"scope"`
+		Subscope         string    `json:"subscope"`
+		CreatedTimestamp time.Time `json:"createdTimestamp"`
+		UpdatedTimestamp time.Time `json:"updatedTimestamp"`
+		Name             string    `json:"name"`
+		MonitorID        string    `json:"monitorId"`
+	} `json:"content"`
+	Number        int  `json:"number"`
+	TotalPages    int  `json:"totalPages"`
+	TotalElements int  `json:"totalElements"`
+	Last          bool `json:"last"`
+	First         bool `json:"first"`
+}
+func createPolicyMonitor(c config) {
+	// policy monitors require public pollers which local envs don't have
+	if c.env == "local" {
+	    return
+	}
+	log.Println("deleting policy monitors")
+	policyUrl := c.adminApiUrl + "api/policies/monitors/"
+	monitorUrl := c.adminApiUrl + "api/policy-monitors/"
+	
+	for {
+		body := doReq("GET", policyUrl,
+			"", "getting all policy monitors", c.adminToken)
+		var resp GetPoliciesResp
+		err := json.Unmarshal(body, &resp)
+		checkErr(err, "unable to parse get policy monitor response")
+		for _, i := range resp.Content {
+			// delete each policy
+// gbj why failing?			_ = doReq("DELETE", policyUrl + i.ID, "", "deleting policy " + i.ID, c.adminToken)
+			// delete the corresponding monitor
+			_ = doReq("DELETE", monitorUrl + i.MonitorID, "", "deleting policy monitor " + i.MonitorID, c.adminToken)
+		}
+		if resp.Last {
+			break
+		}
+	}
+
+	// Now create new policy monitor
+	data := fmt.Sprintf(httpMonitorData, runtime.GOOS, c.publicZoneId, c.port)
+	_ = doReq("POST", monitorUrl, data, "creating policy monitor", c.adminToken)
+	
 }
