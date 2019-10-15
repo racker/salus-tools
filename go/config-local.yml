@@ -5,4 +5,4 @@ adminApiUrl: http://localhost:8888/
 certDir: ../../dev/certs
 kafkaBrokers:
   - localhost:9092
-topic: salus.events.json
+eventTopic: salus.events.json

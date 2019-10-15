@@ -47,7 +47,7 @@ type config = struct {
 	adminToken        string
 	dir               string
 	kafkaBrokers      []string
-	topic             string
+	eventTopic        string
 	port              string
 	certFile          string
 	keyFile           string

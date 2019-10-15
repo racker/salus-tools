@@ -39,6 +39,7 @@ import (
 	"runtime"
 	"strings"
 	"time"
+	"path"
 )
 
 const localConfigTemplate = `resource_id: {{.ResourceId}}
@@ -104,7 +105,7 @@ func initConfig() config {
 	if !strings.HasPrefix(certDir, "/") {
 		wd, err := os.Getwd()
 		checkErr(err, "getting working dir")
-		certDir = wd + "/" + certDir
+		certDir = path.Join(wd, certDir)
 	}
 	c.certDir = certDir
 	c.regularId = viper.GetString("regularId")
@@ -113,7 +114,7 @@ func initConfig() config {
 	checkErr(err, "error creating temp dir")
 	c.dir = dir
 	c.kafkaBrokers = viper.GetStringSlice("kafkaBrokers")
-	c.topic = viper.GetString("topic")
+	c.eventTopic = viper.GetString("eventTopic")
 	c.identityUrl = viper.GetString("identityUrl")
 	c.authUrl = viper.GetString("authUrl")
 	c.ambassadorAddress = viper.GetString("ambassadorAddress")
@@ -128,40 +129,6 @@ func initConfig() config {
 	c.regularToken = getToken(c, c.regularId, c.regularApiKey, "")
 	c.adminToken = getToken(c, c.adminId, c.adminApiKey, c.adminPassword)
 	return c
-}
-
-const apiTokenData = `{
-    "auth": {
-       "RAX-KSKEY:apiKeyCredentials": {  
-          "username": "%s",  
-          "apiKey": "%s"}
-    }  
-}`
-const pwTokenData = `{
-   "auth": {
-       "passwordCredentials": {
-          "username":"%s",
-          "password":"%s"
-       }
-    }
-}`
-
-func getToken(c config, user string, apiKey string, pw string) string {
-	if user == "" {
-		return ""
-	}
-	url := c.identityUrl
-	var tokenData string
-	if pw != "" {
-		tokenData = fmt.Sprintf(pwTokenData, user, pw)
-	} else {
-		tokenData = fmt.Sprintf(apiTokenData, user, apiKey)
-	}
-	var resp IdentityResp
-	body := doReq("POST", url, tokenData, "getting token for : "+user, "")
-	err := json.Unmarshal(body, &resp)
-	checkErr(err, "unable to parse identity response")
-	return resp.Access.Token.ID
 }
 func checkErr(err error, message string) {
 	if err != nil {
@@ -501,7 +468,7 @@ func checkForEvents(c config, eventFound chan bool) {
 	if c.mode == "local" {
 		r = kafka.NewReader(kafka.ReaderConfig{
 			Brokers:  c.kafkaBrokers,
-			Topic:    c.topic,
+			Topic:    c.eventTopic,
 			MinBytes: 1,
 			MaxBytes: 10e6, // 10MB
 		})
@@ -529,7 +496,7 @@ func checkForEvents(c config, eventFound chan bool) {
 
 		r = kafka.NewReader(kafka.ReaderConfig{
 			Brokers:  c.kafkaBrokers,
-			Topic:    c.topic,
+			Topic:    c.eventTopic,
 			MinBytes: 1,
 			MaxBytes: 10e6, // 10MB
 			Dialer:   dialer,
