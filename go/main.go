@@ -187,7 +187,7 @@ func main() {
 	go checkForEvents(c, eventFound)
 	createMonitor(c)
 	createPolicyMonitor(c)
-	checkPresenceMonitor(c)
+//	gbj checkPresenceMonitor(c)
 	log.Println("looking for events:")
 	select {
 	case <-eventFound:
@@ -356,8 +356,10 @@ func closeResp(resp *http.Response) {
 func deleteAgentInstalls(c config) {
 	log.Println("deleting AgentInstalls")
 	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/agent-installs/"
-	for {
-		installBody := doReq("GET", url,
+	
+	for page := 0; ;page += 1 {
+		pageStr := fmt.Sprintf("?page=%d", page)
+		installBody := doReq("GET", url + pageStr,
 			"", "getting all agent installs", c.regularToken)
 		var resp GetAgentInstallsResp
 		err := json.Unmarshal(installBody, &resp)
@@ -377,8 +379,9 @@ func deleteAgentInstalls(c config) {
 func deleteResources(c config) {
 	log.Println("deleting Resources")
 	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/resources/"
-	for {
-		body := doReq("GET", url,
+	for page := 0; ;page += 1 {
+		pageStr := fmt.Sprintf("?page=%d", page)
+		body := doReq("GET", url + pageStr,
 			"", "getting all resources", c.regularToken)
 		var resp GetResourcesResp
 		err := json.Unmarshal(body, &resp)
@@ -399,8 +402,9 @@ func deleteResources(c config) {
 func deleteMonitors(c config) {
 	log.Println("deleting Monitors")
 	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/monitors/"
-	for {
-		body := doReq("GET", url,
+	for page := 0; ;page += 1 {
+		pageStr := fmt.Sprintf("?page=%d", page)
+		body := doReq("GET", url + pageStr,
 			"", "getting all monitors", c.regularToken)
 		var resp GetMonitorsResp
 		err := json.Unmarshal(body, &resp)
@@ -419,8 +423,9 @@ func deleteMonitors(c config) {
 func createPrivateZone(c config) {
 	log.Println("deleting private zones")
 	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/zones/"
-	for {
-		body := doReq("GET", url,
+	for page := 0; ;page += 1 {
+		pageStr := fmt.Sprintf("?page=%d", page)
+		body := doReq("GET", url + pageStr,
 			"", "getting all zones", c.regularToken)
 		var resp GetZonesResp
 		err := json.Unmarshal(body, &resp)
@@ -464,8 +469,9 @@ const taskData = `{
 func createTask(c config) {
 	log.Println("deleting Tasks")
 	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/event-tasks/"
-	for {
-		body := doReq("GET", url,
+	for page := 0; ;page += 1 {
+		pageStr := fmt.Sprintf("?page=%d", page)
+		body := doReq("GET", url + pageStr,
 			"", "getting all tasks", c.regularToken)
 		var resp GetTasksResp
 		err := json.Unmarshal(body, &resp)
@@ -622,13 +628,19 @@ func createPolicyMonitor(c config) {
 	policyUrl := c.adminApiUrl + "api/policies/monitors/"
 	monitorUrl := c.adminApiUrl + "api/policy-monitors/"
 
-	for {
-		body := doReq("GET", policyUrl,
+	for page := 0; ;page += 1 {
+		pageStr := fmt.Sprintf("?page=%d", page)
+		body := doReq("GET", policyUrl + pageStr,
 			"", "getting all policy monitors", c.adminToken)
 		var resp GetPoliciesResp
 		err := json.Unmarshal(body, &resp)
 		checkErr(err, "unable to parse get policy monitor response")
 		for _, i := range resp.Content {
+			// Only delete policies for this tenant
+			if i.Subscope != c.tenantId {
+				continue
+			}
+		
 			// delete each policy
 			_ = doReq("DELETE", policyUrl+i.ID, "", "deleting policy "+i.ID, c.adminToken)
 			// delete the corresponding monitor
