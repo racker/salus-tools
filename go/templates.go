@@ -119,7 +119,7 @@ const httpMonitorData = `{
     "monitoringZones": ["%s"],
     "plugin": {
       "type": "http_response",
-      "address": "http://www.google.com:%s",
+      "address": "http://localhost:%s",
       "responseTimeout": "3s",
       "method": "GET"
     }

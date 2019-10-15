@@ -108,14 +108,17 @@ func main() {
 	deleteAgentInstalls(c)
 	deleteResources(c)
 	deleteMonitors(c)
+	deletePrivateZones(c)
 	createPrivateZone(c)
 
 	cmd := initEnvoy(c, releaseId)
 	defer killCmd(cmd)
-	createTask(c)
+	deleteTasks(c)
+	createTasks(c)
 	eventFound := make(chan bool, 1)
 	go checkForEvents(c, eventFound)
-	createMonitor(c)
+	createMonitors(c)
+	deletePolicyMonitors(c)
 	createPolicyMonitor(c)
 //	gbj checkPresenceMonitor(c)
 	log.Println("looking for events:")
@@ -150,16 +153,17 @@ func initEnvoy(c config, releaseId string) (cmd *exec.Cmd) {
 	err = tmpl.Execute(f, TemplateFields{c.resourceId, c.privateZoneId,
 		c.certDir, c.regularApiKey, c.regularId, c.authUrl, c.ambassadorAddress})
 	checkErr(err, "creating envoy template")
+	err = f.Close()
+	checkErr(err, "closing envoy config file: " + configFileName)
 	cmd = exec.Command(os.Getenv("GOPATH")+"/bin/telemetry-envoy", "run", "--config="+configFileName)
 	cmd.Dir = c.dir
-	cmd.Stdout, err = os.Create(c.dir + "/envoyStdout")
+	cmd.Stdout, err = os.Create(c.dir + "/envoyStdout.log")
 	checkErr(err, "redirecting stdout")
-	cmd.Stderr, err = os.Create(c.dir + "/envoyStderr")
+	cmd.Stderr, err = os.Create(c.dir + "/envoyStderr.log")
 	checkErr(err, "redirecting stderr")
 	err = cmd.Start()
 	checkErr(err, "starting envoy")
 
-	// give it time to start
 	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/agent-installs"
 	installData := `{
 	"agentReleaseId": "%s",
@@ -289,7 +293,7 @@ func deleteMonitors(c config) {
 	}
 }
 
-func createPrivateZone(c config) {
+func deletePrivateZones(c config) {
 	log.Println("deleting private zones")
 	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/zones/"
 	for page := 0; ;page += 1 {
@@ -309,15 +313,17 @@ func createPrivateZone(c config) {
 			break
 		}
 	}
+}
 
-	// Now create new one
+func createPrivateZone(c config) {
+	log.Println("creating private zone")
+	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/zones/"
 	message := `{"name": "` + c.privateZoneId + `"}`
 	log.Println("creating zone: %s %s", url, message)
 	_ = doReq("POST", url, message, "creating private zone", c.regularToken)
-
 }
 
-func createTask(c config) {
+func deleteTasks(c config) {
 	log.Println("deleting Tasks")
 	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/event-tasks/"
 	for page := 0; ;page += 1 {
@@ -336,13 +342,15 @@ func createTask(c config) {
 			break
 		}
 	}
+}
 
-	// Now create new one
+func createTasks(c config) {
+	log.Println("create Tasks")
+	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/event-tasks/"
 	data := fmt.Sprintf(taskData, "net_response_task_"+c.id, "net_response", runtime.GOOS)
 	_ = doReq("POST", url, data, "creating net task", c.regularToken)
 	data = fmt.Sprintf(taskData, "http_response_task_"+c.id, "http_response", runtime.GOOS)
 	_ = doReq("POST", url, data, "creating http task", c.regularToken)
-
 }
 
 func checkForEvents(c config, eventFound chan bool) {
@@ -415,7 +423,7 @@ func checkForEvents(c config, eventFound chan bool) {
 
 }
 
-func createMonitor(c config) {
+func createMonitors(c config) {
 	log.Println("creating Monitors")
 
 	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/monitors/"
@@ -431,7 +439,7 @@ func createMonitor(c config) {
 
 }
 
-func createPolicyMonitor(c config) {
+func deletePolicyMonitors(c config) {
 	// policy monitors require public pollers which local envs don't have
 	if c.mode == "local" {
 		return
@@ -462,6 +470,16 @@ func createPolicyMonitor(c config) {
 			break
 		}
 	}
+}
+
+func createPolicyMonitor(c config) {
+	// policy monitors require public pollers which local envs don't have
+	if c.mode == "local" {
+		return
+	}
+	log.Println("creating policy monitors")
+	policyUrl := c.adminApiUrl + "api/policies/monitors/"
+	monitorUrl := c.adminApiUrl + "api/policy-monitors/"
 
 	// Now create new policy monitor
 	data := fmt.Sprintf(httpMonitorData, runtime.GOOS, c.publicZoneId, c.port)
