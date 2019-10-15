@@ -1,4 +1,4 @@
-env: dev
+mode: full
 regularId: <normal rackspace user name>
 tenantId: <rackspace tenant id>
 adminId: <rackspace admin user>

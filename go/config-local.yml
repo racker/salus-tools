@@ -1,4 +1,4 @@
-env: local
+mode: local
 tenantId: aaaaaa
 publicApiUrl: http://localhost:8080/
 adminApiUrl: http://localhost:8888/

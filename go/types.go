@@ -31,7 +31,7 @@ type TemplateFields = struct {
 	AmbassadorAddress string
 }
 type config = struct {
-	env               string
+	mode              string
 	currentUUID       uuid.UUID
 	id                string
 	privateZoneId     string

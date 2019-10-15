@@ -90,7 +90,7 @@ func initConfig() config {
 	checkErr(err, "Config file not found "+*cfgFile)
 	log.Println("loaded: " + *cfgFile)
 	var c config
-	c.env = viper.GetString("env")
+	c.mode = viper.GetString("mode")
 	c.currentUUID = uuid.NewV4()
 	c.id = strings.Replace(c.currentUUID.String(), "-", "", -1)
 	c.privateZoneId = "privateZone_" + c.id
@@ -209,7 +209,7 @@ func initEnvoy(c config, releaseId string) (cmd *exec.Cmd) {
 	f, err := os.Create(configFileName)
 	checkErr(err, "create envoy config file: "+configFileName)
 	var configTemplate string
-	if c.env == "local" {
+	if c.mode == "local" {
 		configTemplate = localConfigTemplate
 	} else {
 		configTemplate = remoteConfigTemplate
@@ -492,7 +492,7 @@ func checkForEvents(c config, eventFound chan bool) {
 	var r *kafka.Reader
 	finishedMap := make(map[string]bool)
 	finishedMap["net"] = false
-	if c.env == "local" {
+	if c.mode == "local" {
 		r = kafka.NewReader(kafka.ReaderConfig{
 			Brokers:  c.kafkaBrokers,
 			Topic:    c.topic,
@@ -597,7 +597,7 @@ func createMonitor(c config) {
 	data := fmt.Sprintf(netMonitorData, runtime.GOOS, c.privateZoneId, c.port)
 	_ = doReq("POST", url, data, "creating net monitor", c.regularToken)
 
-	if c.env != "local" {
+	if c.mode != "local" {
 		adminUrl := c.adminApiUrl + "api/policy-monitors"
 		data = fmt.Sprintf(httpMonitorData, runtime.GOOS, c.publicZoneId, c.port)
 		_ = doReq("POST", adminUrl, data, "creating http monitor", c.adminToken)
@@ -615,7 +615,7 @@ const monitorPolicyData = `{
 
 func createPolicyMonitor(c config) {
 	// policy monitors require public pollers which local envs don't have
-	if c.env == "local" {
+	if c.mode == "local" {
 		return
 	}
 	log.Println("deleting policy monitors")
