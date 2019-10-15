@@ -41,7 +41,7 @@ import (
 	"time"
 )
 
-var localConfigTemplate = `resource_id: {{.ResourceId}}
+const localConfigTemplate = `resource_id: {{.ResourceId}}
 zone: {{.PrivateZoneID}}
 labels:
   environment: localdev
@@ -61,18 +61,18 @@ ingest:
 agents:
   dataPath: data-telemetry-envoy
 `
-var remoteConfigTemplate = `resource_id: "{{.ResourceId }}"
+const remoteConfigTemplate = `resource_id: "{{.ResourceId }}"
 zone: {{.PrivateZoneID}}
 tls:
   auth_service:
-    url: https://salus-auth-serv.dev.monplat.rackspace.net
+    url: {{.AuthUrl}}
     token_provider: keystone_v2
   token_providers:
     keystone_v2:
       username: "{{.RegularId}}"
       apikey: "{{.ApiKey}}"
 ambassador:
-  address: salus-ambassador.dev.monplat.rackspace.net:443
+  address: {{.AmbassadorAddress}}
 agents:
   dataPath: data-telemetry-envoy
 `
@@ -109,6 +109,9 @@ func initConfig() config {
 	c.dir = dir
 	c.kafkaBrokers = viper.GetStringSlice("kafkaBrokers")
 	c.topic = viper.GetString("topic")
+	c.identityUrl = viper.GetString("identityUrl")
+	c.authUrl = viper.GetString("authUrl")
+	c.ambassadorAddress = viper.GetString("ambassadorAddress")
 	//gbj pick port dynamically?
 	c.port = "8222"
 	c.publicZoneId = "public/us_central_1"
@@ -118,8 +121,8 @@ func initConfig() config {
 	c.regularApiKey = os.Getenv("E2ET_REGULAR_API_KEY")
 	c.adminApiKey = os.Getenv("E2ET_ADMIN_API_KEY")
 	c.adminPassword = os.Getenv("E2ET_ADMIN_PASSWORD")
-	c.regularToken = getToken(c.regularId, c.regularApiKey, "")
-	c.adminToken = getToken(c.adminId, c.adminApiKey, c.adminPassword)
+	c.regularToken = getToken(c, c.regularId, c.regularApiKey, "")
+	c.adminToken = getToken(c, c.adminId, c.adminApiKey, c.adminPassword)
 	return c
 }
 
@@ -139,11 +142,11 @@ const pwTokenData = `{
     }
 }`
 
-func getToken(user string, apiKey string, pw string) string {
+func getToken(c config, user string, apiKey string, pw string) string {
 	if user == "" {
 		return ""
 	}
-	url := "https://identity.api.rackspacecloud.com/v2.0/tokens"
+	url := c.identityUrl
 	var tokenData string
 	if pw != "" {
 		tokenData = fmt.Sprintf(pwTokenData, user, pw)
@@ -210,10 +213,8 @@ func initEnvoy(c config, releaseId string) (cmd *exec.Cmd) {
 	}
 
 	tmpl.Execute(f, TemplateFields{c.resourceId, c.privateZoneId,
-		c.certDir, c.regularApiKey, c.regularId})
-	// gbj bin file
-	envoyExeDir := "/Users/geor7956/go/bin/"
-	cmd = exec.Command(envoyExeDir+"telemetry-envoy", "run", "--config="+configFileName)
+		c.certDir, c.regularApiKey, c.regularId, c.authUrl, c.ambassadorAddress})
+	cmd = exec.Command(os.Getenv("GOPATH") + "/bin/telemetry-envoy", "run", "--config="+configFileName)
 	cmd.Dir = c.dir
 	cmd.Stdout, err = os.Create(c.dir + "/envoyStdout")
 	if err != nil {
@@ -252,7 +253,7 @@ func initEnvoy(c config, releaseId string) (cmd *exec.Cmd) {
 	return cmd
 }
 
-var linuxReleaseData = `{
+const linuxReleaseData = `{
   "type": "TELEGRAF",
   "version": "1.11.0",
   "labels": {
@@ -263,7 +264,7 @@ var linuxReleaseData = `{
   "exe": "./telegraf/telegraf"
 }
 `
-var darwinReleaseData = `{
+const darwinReleaseData = `{
   "type": "TELEGRAF",
   "version": "1.11.0",
   "labels": {
@@ -323,9 +324,15 @@ curl %s  \
 `
 
 func doReq(method string, url string, data string, errMessage string, token string) []byte {
+	var printedToken string
+	if os.Getenv("E2ET_PRINT_TOKENS") != "" {
+		printedToken = token
+	} else {
+		printedToken = "xxx"
+	}
 	if !strings.Contains(data, "username") {
 		log.Printf("Running equivalent curl:\n %s",
-			fmt.Sprintf(curlOutput, url, method, strings.Replace(data, "\n", "", -1), token))
+			fmt.Sprintf(curlOutput, url, method, strings.Replace(data, "\n", "", -1), printedToken))
 
 	}
 	req, err := http.NewRequest(method, url, bytes.NewBuffer([]byte(data)))
@@ -350,6 +357,7 @@ func doReq(method string, url string, data string, errMessage string, token stri
 func deleteAgentInstalls(c config) {
 	log.Println("deleting AgentInstalls")
 	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/agent-installs/"
+	for {
 	installBody := doReq("GET", url,
 		"", "getting all agent installs", c.regularToken)
 	var resp GetAgentInstallsResp
@@ -360,11 +368,17 @@ func deleteAgentInstalls(c config) {
 		_ = doReq("DELETE", url+i.ID, "", "deleting agent install "+i.ID, c.regularToken)
 
 	}
+		if resp.Last {
+			break
+		}
+	}
+	
 }
 
 func deleteResources(c config) {
 	log.Println("deleting Resources")
 	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/resources/"
+	for {
 	body := doReq("GET", url,
 		"", "getting all resources", c.regularToken)
 	var resp GetResourcesResp
@@ -376,6 +390,11 @@ func deleteResources(c config) {
 		_ = doReq("DELETE", url+i.ResourceID, "", "deleting resource "+i.ResourceID, c.regularToken)
 
 	}
+		if resp.Last {
+			break
+		}
+	}
+		
 }
 
 func deleteMonitors(c config) {
@@ -425,7 +444,7 @@ func createPrivateZone(c config) {
 
 }
 
-var taskData = `{
+const taskData = `{
 	"name": "%s",
 	"measurement": "%s",
 	"taskParameters": {
@@ -436,7 +455,7 @@ var taskData = `{
 			"consecutiveCount": 1,
 			"expression": {
 				"field": "result_code",
-				"threshold": 0.0,
+				"threshold": -1,
 				"comparator": ">"
 			}
 		}
@@ -483,7 +502,7 @@ func checkForEvents(c config, eventFound chan bool) {
 		})
 
 	} else {
-		finishedMap["http"] = false
+		// gbj finishedMap["http"] = false
 		// Load client cert
 		cert, err := tls.LoadX509KeyPair(c.certFile, c.keyFile)
 		if err != nil {
@@ -551,7 +570,7 @@ func checkForEvents(c config, eventFound chan bool) {
 
 }
 
-var netMonitorData = `{
+const netMonitorData = `{
   "labelSelector": {
     "agent_discovered_os": "%s"
   },
@@ -566,7 +585,7 @@ var netMonitorData = `{
     }
   }
 }`
-var httpMonitorData = `{
+const httpMonitorData = `{
   "labelSelector": {
     "agent_discovered_os": "%s"
   },
@@ -576,7 +595,7 @@ var httpMonitorData = `{
     "monitoringZones": ["%s"],
     "plugin": {
       "type": "http_response",
-      "address": "http://georgejahad:%s",
+      "address": "http://www.google.com:%s",
       "responseTimeout": "3s",
       "method": "GET"
     }
@@ -590,9 +609,11 @@ func createMonitor(c config) {
 	data := fmt.Sprintf(netMonitorData, runtime.GOOS, c.privateZoneId, c.port)
 	_ = doReq("POST", url, data, "creating net monitor", c.regularToken)
 
+	if c.env != "local" {
 	adminUrl := c.adminApiUrl + "api/policy-monitors"
 	data = fmt.Sprintf(httpMonitorData, runtime.GOOS, c.publicZoneId, c.port)
 	_ = doReq("POST", adminUrl, data, "creating http monitor", c.adminToken)
+	}
 	log.Println("monitors created")
 
 }
