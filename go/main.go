@@ -501,7 +501,7 @@ func checkForEvents(c config, eventFound chan bool) {
 		})
 
 	} else {
-		// gbj finishedMap["http"] = false
+		finishedMap["http"] = false
 		cert, err := tls.LoadX509KeyPair(c.certFile, c.keyFile)
 		checkErr(err, "loading client cert")
 		caCert, err := ioutil.ReadFile(c.caFile)
