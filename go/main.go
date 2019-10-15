@@ -87,7 +87,7 @@ func initConfig() config {
 	flag.Parse()
 	viper.SetConfigFile(*cfgFile)
 	err := viper.ReadInConfig()
-	checkErr(err, "Config file not found " + *cfgFile)
+	checkErr(err, "Config file not found "+*cfgFile)
 	log.Println("loaded: " + *cfgFile)
 	var c config
 	c.env = viper.GetString("env")
@@ -100,7 +100,7 @@ func initConfig() config {
 	c.adminApiUrl = viper.GetString("adminApiUrl")
 	c.agentReleaseUrl = c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/agent-releases"
 	certDir := viper.GetString("certDir")
-	
+
 	if !strings.HasPrefix(certDir, "/") {
 		wd, err := os.Getwd()
 		checkErr(err, "getting working dir")
@@ -207,7 +207,7 @@ func initEnvoy(c config, releaseId string) (cmd *exec.Cmd) {
 	log.Println("starting envoy")
 	configFileName := c.dir + "/config.yml"
 	f, err := os.Create(configFileName)
-	checkErr(err, "create envoy config file: " + configFileName)
+	checkErr(err, "create envoy config file: "+configFileName)
 	var configTemplate string
 	if c.env == "local" {
 		configTemplate = localConfigTemplate
@@ -241,7 +241,7 @@ func initEnvoy(c config, releaseId string) (cmd *exec.Cmd) {
 	_ = doReq("POST", url, fmt.Sprintf(installData, releaseId, runtime.GOOS), "creating agent install", c.regularToken)
 	// give it time to install
 	time.Sleep(20 * time.Second)
-	 _, err = os.Stat(c.dir + "/data-telemetry-envoy")
+	_, err = os.Stat(c.dir + "/data-telemetry-envoy")
 	checkErr(err, "envoy failed")
 	log.Println("envoy started")
 	return cmd
