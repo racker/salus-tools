@@ -19,7 +19,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -41,42 +40,6 @@ import (
 	"time"
 	"path"
 )
-
-const localConfigTemplate = `resource_id: {{.ResourceId}}
-zone: {{.PrivateZoneID}}
-labels:
-  environment: localdev
-tls:
-  provided:
-    ca: {{.CertDir}}/out/ca.pem
-    cert: {{.CertDir}}/out/tenantA.pem
-    key: {{.CertDir}}/out/tenantA-key.pem
-ambassador:
-  address: localhost:6565
-ingest:
-  lumberjack:
-    bind: localhost:5044
-  telegraf:
-    json:
-      bind: localhost:8094
-agents:
-  dataPath: data-telemetry-envoy
-`
-const remoteConfigTemplate = `resource_id: "{{.ResourceId }}"
-zone: {{.PrivateZoneID}}
-tls:
-  auth_service:
-    url: {{.AuthUrl}}
-    token_provider: keystone_v2
-  token_providers:
-    keystone_v2:
-      username: "{{.RegularId}}"
-      apikey: "{{.ApiKey}}"
-ambassador:
-  address: {{.AmbassadorAddress}}
-agents:
-  dataPath: data-telemetry-envoy
-`
 
 func initConfig() config {
 	replacer := strings.NewReplacer(".", "_", "-", "_")
@@ -214,28 +177,6 @@ func initEnvoy(c config, releaseId string) (cmd *exec.Cmd) {
 	return cmd
 }
 
-const linuxReleaseData = `{
-  "type": "TELEGRAF",
-  "version": "1.11.0",
-  "labels": {
-    "agent_discovered_os": "linux",
-    "agent_discovered_arch": "amd64"
-  },
-  "url": "https://dl.influxdata.com/telegraf/releases/telegraf-1.11.0-static_linux_amd64.tar.gz",
-  "exe": "./telegraf/telegraf"
-}
-`
-const darwinReleaseData = `{
-  "type": "TELEGRAF",
-  "version": "1.11.0",
-  "labels": {
-    "agent_discovered_os": "darwin",
-    "agent_discovered_arch": "amd64"
-  },
-  "url": "https://homebrew.bintray.com/bottles/telegraf-1.11.0.high_sierra.bottle.tar.gz",
-  "exe": "telegraf/1.11.0/bin/telegraf"
-}`
-
 func getReleases(c config) string {
 	releaseData := make(map[string]string)
 	releaseData["linux-amd64"] = linuxReleaseData
@@ -274,45 +215,6 @@ func getReleases(c config) string {
 		return entry.Id
 	}
 
-}
-
-const curlOutput = `
-curl %s  \
-    -X %s \
-    -d '%s' \
-    -H "Content-type: application/json" \
-    -H "x-auth-token: %s"
-`
-
-func doReq(method string, url string, data string, errMessage string, token string) []byte {
-	var printedToken string
-	if os.Getenv("E2ET_PRINT_TOKENS") != "" {
-		printedToken = token
-	} else {
-		printedToken = "xxx"
-	}
-	if !strings.Contains(data, "username") {
-		log.Printf("Running equivalent curl:\n %s",
-			fmt.Sprintf(curlOutput, url, method, strings.Replace(data, "\n", "", -1), printedToken))
-
-	}
-	req, err := http.NewRequest(method, url, bytes.NewBuffer([]byte(data)))
-	checkErr(err, "request create failed: "+errMessage)
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("x-auth-token", token)
-	// Do the request
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	checkErr(err, "client create failed: "+errMessage)
-	defer closeResp(resp)
-	body, err := ioutil.ReadAll(resp.Body)
-	checkErr(err, "unable read response body: "+errMessage)
-	if resp.StatusCode/100 != 2 {
-		log.Println(errMessage + ": " + string(body))
-		log.Fatal("status code: " + resp.Status)
-	}
-
-	return body
 }
 
 func closeResp(resp *http.Response) {
@@ -415,24 +317,6 @@ func createPrivateZone(c config) {
 
 }
 
-const taskData = `{
-	"name": "%s",
-	"measurement": "%s",
-	"taskParameters": {
-		"labelSelector": {
-			"agent_discovered_os": "%s"
-		},
-		"critical": {
-			"consecutiveCount": 1,
-			"expression": {
-				"field": "result_code",
-				"threshold": 0.0,
-				"comparator": ">"
-			}
-		}
-	}
-}`
-
 func createTask(c config) {
 	log.Println("deleting Tasks")
 	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/event-tasks/"
@@ -531,38 +415,6 @@ func checkForEvents(c config, eventFound chan bool) {
 
 }
 
-const netMonitorData = `{
-  "labelSelector": {
-    "agent_discovered_os": "%s"
-  },
-  "interval": "PT30S",
-  "details": {
-    "type": "remote",
-    "monitoringZones": ["%s"],
-    "plugin": {
-      "type": "net_response",
-      "address": "localhost:%s",
-      "protocol": "tcp"
-    }
-  }
-}`
-const httpMonitorData = `{
-  "labelSelector": {
-    "agent_discovered_os": "%s"
-  },
-  "interval": "PT30S",
-  "details": {
-    "type": "remote",
-    "monitoringZones": ["%s"],
-    "plugin": {
-      "type": "http_response",
-      "address": "http://www.google.com:%s",
-      "responseTimeout": "3s",
-      "method": "GET"
-    }
-  }
-}`
-
 func createMonitor(c config) {
 	log.Println("creating Monitors")
 
@@ -578,13 +430,6 @@ func createMonitor(c config) {
 	log.Println("monitors created")
 
 }
-
-const monitorPolicyData = `{
-  "scope": "TENANT",
-  "subscope": "%s",
-  "name": "E2ET_%s",
-  "monitorId": "%s"
-}`
 
 func createPolicyMonitor(c config) {
 	// policy monitors require public pollers which local envs don't have
