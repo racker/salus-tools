@@ -22,42 +22,42 @@ type AgentReleaseType = struct {
 }
 
 type TemplateFields = struct {
-	ResourceId    string
-	PrivateZoneID string
-	CertDir       string
-	ApiKey        string
-	RegularId     string
-	AuthUrl string
+	ResourceId        string
+	PrivateZoneID     string
+	CertDir           string
+	ApiKey            string
+	RegularId         string
+	AuthUrl           string
 	AmbassadorAddress string
 }
 type config = struct {
-	env             string
-	currentUUID     uuid.UUID
-	id              string
-	privateZoneId   string
-	resourceId      string
-	tenantId        string
-	regularId       string
-	adminId         string
-	publicApiUrl    string
-	adminApiUrl     string
-	agentReleaseUrl string
-	certDir         string
-	regularToken    string
-	adminToken      string
-	dir             string
-	kafkaBrokers    []string
-	topic           string
-	port            string
-	certFile        string
-	keyFile         string
-	caFile          string
-	regularApiKey   string
-	adminApiKey     string
-	adminPassword   string
-	publicZoneId    string
-	identityUrl string
-	authUrl string
+	env               string
+	currentUUID       uuid.UUID
+	id                string
+	privateZoneId     string
+	resourceId        string
+	tenantId          string
+	regularId         string
+	adminId           string
+	publicApiUrl      string
+	adminApiUrl       string
+	agentReleaseUrl   string
+	certDir           string
+	regularToken      string
+	adminToken        string
+	dir               string
+	kafkaBrokers      []string
+	topic             string
+	port              string
+	certFile          string
+	keyFile           string
+	caFile            string
+	regularApiKey     string
+	adminApiKey       string
+	adminPassword     string
+	publicZoneId      string
+	identityUrl       string
+	authUrl           string
 	ambassadorAddress string
 }
 

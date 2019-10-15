@@ -214,7 +214,7 @@ func initEnvoy(c config, releaseId string) (cmd *exec.Cmd) {
 
 	tmpl.Execute(f, TemplateFields{c.resourceId, c.privateZoneId,
 		c.certDir, c.regularApiKey, c.regularId, c.authUrl, c.ambassadorAddress})
-	cmd = exec.Command(os.Getenv("GOPATH") + "/bin/telemetry-envoy", "run", "--config="+configFileName)
+	cmd = exec.Command(os.Getenv("GOPATH")+"/bin/telemetry-envoy", "run", "--config="+configFileName)
 	cmd.Dir = c.dir
 	cmd.Stdout, err = os.Create(c.dir + "/envoyStdout")
 	if err != nil {
@@ -228,7 +228,6 @@ func initEnvoy(c config, releaseId string) (cmd *exec.Cmd) {
 	if err != nil {
 		log.Fatal(err)
 	}
-
 
 	// give it time to start
 	time.Sleep(10 * time.Second)
@@ -358,43 +357,43 @@ func deleteAgentInstalls(c config) {
 	log.Println("deleting AgentInstalls")
 	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/agent-installs/"
 	for {
-	installBody := doReq("GET", url,
-		"", "getting all agent installs", c.regularToken)
-	var resp GetAgentInstallsResp
-	err := json.Unmarshal(installBody, &resp)
-	checkErr(err, "unable to parse get agent installs response")
-	for _, i := range resp.Content {
-		// delete each install
-		_ = doReq("DELETE", url+i.ID, "", "deleting agent install "+i.ID, c.regularToken)
+		installBody := doReq("GET", url,
+			"", "getting all agent installs", c.regularToken)
+		var resp GetAgentInstallsResp
+		err := json.Unmarshal(installBody, &resp)
+		checkErr(err, "unable to parse get agent installs response")
+		for _, i := range resp.Content {
+			// delete each install
+			_ = doReq("DELETE", url+i.ID, "", "deleting agent install "+i.ID, c.regularToken)
 
-	}
+		}
 		if resp.Last {
 			break
 		}
 	}
-	
+
 }
 
 func deleteResources(c config) {
 	log.Println("deleting Resources")
 	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/resources/"
 	for {
-	body := doReq("GET", url,
-		"", "getting all resources", c.regularToken)
-	var resp GetResourcesResp
-	err := json.Unmarshal(body, &resp)
-	checkErr(err, "unable to parse get resources response")
-	for _, i := range resp.Content {
-		log.Println("delete resource: " + i.ResourceID)
-		// delete each resource
-		_ = doReq("DELETE", url+i.ResourceID, "", "deleting resource "+i.ResourceID, c.regularToken)
+		body := doReq("GET", url,
+			"", "getting all resources", c.regularToken)
+		var resp GetResourcesResp
+		err := json.Unmarshal(body, &resp)
+		checkErr(err, "unable to parse get resources response")
+		for _, i := range resp.Content {
+			log.Println("delete resource: " + i.ResourceID)
+			// delete each resource
+			_ = doReq("DELETE", url+i.ResourceID, "", "deleting resource "+i.ResourceID, c.regularToken)
 
-	}
+		}
 		if resp.Last {
 			break
 		}
 	}
-		
+
 }
 
 func deleteMonitors(c config) {
@@ -497,7 +496,7 @@ func checkForEvents(c config, eventFound chan bool) {
 		r = kafka.NewReader(kafka.ReaderConfig{
 			Brokers:  c.kafkaBrokers,
 			Topic:    c.topic,
-			MinBytes: 1,    
+			MinBytes: 1,
 			MaxBytes: 10e6, // 10MB
 		})
 
@@ -610,9 +609,9 @@ func createMonitor(c config) {
 	_ = doReq("POST", url, data, "creating net monitor", c.regularToken)
 
 	if c.env != "local" {
-	adminUrl := c.adminApiUrl + "api/policy-monitors"
-	data = fmt.Sprintf(httpMonitorData, runtime.GOOS, c.publicZoneId, c.port)
-	_ = doReq("POST", adminUrl, data, "creating http monitor", c.adminToken)
+		adminUrl := c.adminApiUrl + "api/policy-monitors"
+		data = fmt.Sprintf(httpMonitorData, runtime.GOOS, c.publicZoneId, c.port)
+		_ = doReq("POST", adminUrl, data, "creating http monitor", c.adminToken)
 	}
 	log.Println("monitors created")
 
@@ -624,6 +623,7 @@ const monitorPolicyData = `{
   "name": "E2ET_%s",
   "monitorId": "%s"
 }`
+
 func createPolicyMonitor(c config) {
 	// policy monitors require public pollers which local envs don't have
 	if c.env == "local" {
