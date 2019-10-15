@@ -86,11 +86,9 @@ func initConfig() config {
 	cfgFile := flag.String("config", "config.yml", "config file")
 	flag.Parse()
 	viper.SetConfigFile(*cfgFile)
-	if err := viper.ReadInConfig(); err == nil {
-		log.Println("loaded: " + *cfgFile)
-	} else {
-		log.Fatal("Config file not found " + *cfgFile)
-	}
+	err := viper.ReadInConfig()
+	checkErr(err, "Config file not found " + *cfgFile)
+	log.Println("loaded: " + *cfgFile)
 	var c config
 	c.env = viper.GetString("env")
 	c.currentUUID = uuid.NewV4()
@@ -101,7 +99,15 @@ func initConfig() config {
 	c.publicApiUrl = viper.GetString("publicApiUrl")
 	c.adminApiUrl = viper.GetString("adminApiUrl")
 	c.agentReleaseUrl = c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/agent-releases"
-	c.certDir = viper.GetString("certDir")
+	certDir := viper.GetString("certDir")
+	
+	if !strings.HasPrefix(certDir, "/") {
+		wd, err := os.Getwd()
+		checkErr(err, "getting working dir")
+		certDir = wd + "/" + certDir
+	}
+	c.certDir = certDir
+	fmt.Println("gbj cert dir is: " + certDir)
 	c.regularId = viper.GetString("regularId")
 	c.adminId = viper.GetString("adminId")
 	dir, err := ioutil.TempDir("", "e2et")
@@ -177,7 +183,7 @@ func main() {
 	createPrivateZone(c)
 
 	cmd := initEnvoy(c, releaseId)
-	defer cmd.Process.Kill()
+	defer killCmd(cmd)
 	createTask(c)
 	eventFound := make(chan bool, 1)
 	go checkForEvents(c, eventFound)
@@ -194,13 +200,16 @@ func main() {
 
 }
 
+func killCmd(cmd *exec.Cmd) {
+	err := cmd.Process.Kill()
+	checkErr(err, "killing envoy")
+}
+
 func initEnvoy(c config, releaseId string) (cmd *exec.Cmd) {
 	log.Println("starting envoy")
 	configFileName := c.dir + "/config.yml"
 	f, err := os.Create(configFileName)
-	if err != nil {
-		log.Fatal(err)
-	}
+	checkErr(err, "create envoy config file: " + configFileName)
 	var configTemplate string
 	if c.env == "local" {
 		configTemplate = localConfigTemplate
@@ -208,32 +217,21 @@ func initEnvoy(c config, releaseId string) (cmd *exec.Cmd) {
 		configTemplate = remoteConfigTemplate
 	}
 	tmpl, err := template.New("t1").Parse(configTemplate)
-	if err != nil {
-		log.Fatal(err)
-	}
+	checkErr(err, "parsing envoy template")
 
-	tmpl.Execute(f, TemplateFields{c.resourceId, c.privateZoneId,
+	err = tmpl.Execute(f, TemplateFields{c.resourceId, c.privateZoneId,
 		c.certDir, c.regularApiKey, c.regularId, c.authUrl, c.ambassadorAddress})
+	checkErr(err, "creating envoy template")
 	cmd = exec.Command(os.Getenv("GOPATH")+"/bin/telemetry-envoy", "run", "--config="+configFileName)
 	cmd.Dir = c.dir
 	cmd.Stdout, err = os.Create(c.dir + "/envoyStdout")
-	if err != nil {
-		log.Fatal(err)
-	}
+	checkErr(err, "redirecting stdout")
 	cmd.Stderr, err = os.Create(c.dir + "/envoyStderr")
-	if err != nil {
-		log.Fatal(err)
-	}
+	checkErr(err, "redirecting stderr")
 	err = cmd.Start()
-	if err != nil {
-		log.Fatal(err)
-	}
+	checkErr(err, "starting envoy")
 
 	// give it time to start
-	time.Sleep(10 * time.Second)
-	if _, err = os.Stat(c.dir + "/data-telemetry-envoy"); err == nil {
-		log.Fatal("installs incorrectly removed")
-	}
 	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/agent-installs"
 	installData := `{
 	"agentReleaseId": "%s",
@@ -245,9 +243,8 @@ func initEnvoy(c config, releaseId string) (cmd *exec.Cmd) {
 	_ = doReq("POST", url, fmt.Sprintf(installData, releaseId, runtime.GOOS), "creating agent install", c.regularToken)
 	// give it time to install
 	time.Sleep(20 * time.Second)
-	if _, err = os.Stat(c.dir + "/data-telemetry-envoy"); err != nil {
-		log.Fatal("install failed")
-	}
+	 _, err = os.Stat(c.dir + "/data-telemetry-envoy")
+	checkErr(err, "envoy failed")
 	log.Println("envoy started")
 	return cmd
 }
@@ -342,7 +339,7 @@ func doReq(method string, url string, data string, errMessage string, token stri
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	checkErr(err, "client create failed: "+errMessage)
-	defer resp.Body.Close()
+	defer closeResp(resp)
 	body, err := ioutil.ReadAll(resp.Body)
 	checkErr(err, "unable read response body: "+errMessage)
 	if resp.StatusCode/100 != 2 {
@@ -351,6 +348,11 @@ func doReq(method string, url string, data string, errMessage string, token stri
 	}
 
 	return body
+}
+
+func closeResp(resp *http.Response) {
+	err := resp.Body.Close()
+	checkErr(err, "closing resp body")
 }
 
 func deleteAgentInstalls(c config) {
@@ -502,17 +504,10 @@ func checkForEvents(c config, eventFound chan bool) {
 
 	} else {
 		// gbj finishedMap["http"] = false
-		// Load client cert
 		cert, err := tls.LoadX509KeyPair(c.certFile, c.keyFile)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		// Load CA cert
+		checkErr(err, "loading client cert")
 		caCert, err := ioutil.ReadFile(c.caFile)
-		if err != nil {
-			log.Fatal(err)
-		}
+		checkErr(err, "loading ca cert")
 		caCertPool := x509.NewCertPool()
 		caCertPool.AppendCertsFromPEM(caCert)
 
@@ -539,9 +534,7 @@ func checkForEvents(c config, eventFound chan bool) {
 	log.Println("waiting for events")
 	for {
 		m, err := r.ReadMessage(context.Background())
-		if err != nil {
-			break
-		}
+		checkErr(err, "reading kafka")
 		log.Printf("message at topic/partition/offset %v/%v/%v: %s = %s\n", m.Topic, m.Partition, m.Offset, string(m.Key), string(m.Value))
 		s := string(m.Value)
 		if strings.Contains(s, c.resourceId) {
@@ -564,8 +557,6 @@ func checkForEvents(c config, eventFound chan bool) {
 			}
 		}
 	}
-
-	r.Close()
 
 }
 
