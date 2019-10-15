@@ -1,5 +1,5 @@
 # Salus End to End Test
-The end to end test, e2et, is meant to excercise every microservice in the system and return an inication of where failures are occuring.  It creating a local private poller, and the monitors and tasks to confirm that everything is working.  More details here: [e2et design doc](https://github.com/racker/salus-docs/blob/master/design/end-to-end-test/design.md)
+The end to end test, e2et, is meant to excercise every microservice in the system and return an indication of where failures are occuring.  It creates a local private poller, and the monitors and tasks to confirm that everything is working.  More details here: [e2et design doc](https://github.com/racker/salus-docs/blob/master/design/end-to-end-test/design.md)
 
 ## Build/Invocation
 Running *make* creates the e2et exe.  The exe is run with a config file, like so:
@@ -8,14 +8,14 @@ Running *make* creates the e2et exe.  The exe is run with a config file, like so
 ```
 
 ## Configuration
-There are two basic modes in which the tests run, local and full, (depending on the corresponding value in the config file).  The local mode is a slightly stripped down version which requires less configuration, mostly of ssl certs etc, (you should just be able to run included config-local.yml file without changes.)  It also doesn't use a public poller so you don't need to set that up separately.  It also doesn't require the auth service.  So if you start the other services locally, and run the commands:
+There are two basic modes in which the tests run, local and full, (depending on the corresponding value in the config file).  Local mode is a slightly stripped down version, meant to run on your laptop.  It requires less configuration, mostly of ssl certs etc, (you should just be able to run included config-local.yml file without changes.)  It also doesn't use a public poller or auth service so you don't need to set those up separately.  Just start the other services locally, and run the commands:
 ```
 make
 ./e2et   -config=config-local.yml
 ```
 It should all work.
 
-The full mode excercises everything including the auth service, and public pollers and requires significantly more configuration.  It requires a regular user account as well as an admin account.  A sample full config file is [here](file://./config-dev.yml).  In addition, it requires the following env vars to be set:
+Full mode excercises everything including the auth service, and public pollers and requires significantly more configuration.  It requires a regular user account as well as an admin account.  A sample full config file is [here](./config-dev.yml).  In addition, it requires the following env vars to be set:
 ```
 E2ET_REGULAR_API_KEY   the api key of regular user account
 E2ET_ADMIN_API_KEY     the api key of admin user account
