@@ -454,7 +454,7 @@ const taskData = `{
 			"consecutiveCount": 1,
 			"expression": {
 				"field": "result_code",
-				"threshold": -1,
+				"threshold": 0.0,
 				"comparator": ">"
 			}
 		}
@@ -551,7 +551,7 @@ func checkForEvents(c config, eventFound chan bool) {
 			}
 
 			if allFinished {
-				<-eventFound
+				eventFound<-true
 			}
 		}
 	}
