@@ -107,7 +107,6 @@ func initConfig() config {
 		certDir = wd + "/" + certDir
 	}
 	c.certDir = certDir
-	fmt.Println("gbj cert dir is: " + certDir)
 	c.regularId = viper.GetString("regularId")
 	c.adminId = viper.GetString("adminId")
 	dir, err := ioutil.TempDir("", "e2et")
@@ -118,7 +117,6 @@ func initConfig() config {
 	c.identityUrl = viper.GetString("identityUrl")
 	c.authUrl = viper.GetString("authUrl")
 	c.ambassadorAddress = viper.GetString("ambassadorAddress")
-	//gbj pick port dynamically?
 	c.port = "8222"
 	c.publicZoneId = "public/us_central_1"
 	c.certFile = viper.GetString("certFile")
