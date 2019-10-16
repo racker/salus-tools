@@ -19,9 +19,10 @@
 package main
 
 import (
-	"fmt"
 	"encoding/json"
+	"fmt"
 )
+
 const apiTokenData = `{
     "auth": {
        "RAX-KSKEY:apiKeyCredentials": {  

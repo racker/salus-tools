@@ -17,6 +17,7 @@
  */
 
 package main
+
 import (
 	"bytes"
 	"fmt"
@@ -26,6 +27,7 @@ import (
 	"os"
 	"strings"
 )
+
 const curlOutput = `
 curl %s  \
     -X %s \

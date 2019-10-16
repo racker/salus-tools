@@ -35,10 +35,10 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path"
 	"runtime"
 	"strings"
 	"time"
-	"path"
 )
 
 func initConfig() config {
@@ -154,7 +154,7 @@ func initEnvoy(c config, releaseId string) (cmd *exec.Cmd) {
 		c.certDir, c.regularApiKey, c.regularId, c.authUrl, c.ambassadorAddress})
 	checkErr(err, "creating envoy template")
 	err = f.Close()
-	checkErr(err, "closing envoy config file: " + configFileName)
+	checkErr(err, "closing envoy config file: "+configFileName)
 	cmd = exec.Command(os.Getenv("GOPATH")+"/bin/telemetry-envoy", "run", "--config="+configFileName)
 	cmd.Dir = c.dir
 	cmd.Stdout, err = os.Create(c.dir + "/envoyStdout.log")
@@ -229,10 +229,10 @@ func closeResp(resp *http.Response) {
 func deleteAgentInstalls(c config) {
 	log.Println("deleting AgentInstalls")
 	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/agent-installs/"
-	
-	for page := 0; ;page += 1 {
+
+	for page := 0; ; page += 1 {
 		pageStr := fmt.Sprintf("?page=%d", page)
-		installBody := doReq("GET", url + pageStr,
+		installBody := doReq("GET", url+pageStr,
 			"", "getting all agent installs", c.regularToken)
 		var resp GetAgentInstallsResp
 		err := json.Unmarshal(installBody, &resp)
@@ -252,9 +252,9 @@ func deleteAgentInstalls(c config) {
 func deleteResources(c config) {
 	log.Println("deleting Resources")
 	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/resources/"
-	for page := 0; ;page += 1 {
+	for page := 0; ; page += 1 {
 		pageStr := fmt.Sprintf("?page=%d", page)
-		body := doReq("GET", url + pageStr,
+		body := doReq("GET", url+pageStr,
 			"", "getting all resources", c.regularToken)
 		var resp GetResourcesResp
 		err := json.Unmarshal(body, &resp)
@@ -275,9 +275,9 @@ func deleteResources(c config) {
 func deleteMonitors(c config) {
 	log.Println("deleting Monitors")
 	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/monitors/"
-	for page := 0; ;page += 1 {
+	for page := 0; ; page += 1 {
 		pageStr := fmt.Sprintf("?page=%d", page)
-		body := doReq("GET", url + pageStr,
+		body := doReq("GET", url+pageStr,
 			"", "getting all monitors", c.regularToken)
 		var resp GetMonitorsResp
 		err := json.Unmarshal(body, &resp)
@@ -296,9 +296,9 @@ func deleteMonitors(c config) {
 func deletePrivateZones(c config) {
 	log.Println("deleting private zones")
 	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/zones/"
-	for page := 0; ;page += 1 {
+	for page := 0; ; page += 1 {
 		pageStr := fmt.Sprintf("?page=%d", page)
-		body := doReq("GET", url + pageStr,
+		body := doReq("GET", url+pageStr,
 			"", "getting all zones", c.regularToken)
 		var resp GetZonesResp
 		err := json.Unmarshal(body, &resp)
@@ -326,9 +326,9 @@ func createPrivateZone(c config) {
 func deleteTasks(c config) {
 	log.Println("deleting Tasks")
 	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/event-tasks/"
-	for page := 0; ;page += 1 {
+	for page := 0; ; page += 1 {
 		pageStr := fmt.Sprintf("?page=%d", page)
-		body := doReq("GET", url + pageStr,
+		body := doReq("GET", url+pageStr,
 			"", "getting all tasks", c.regularToken)
 		var resp GetTasksResp
 		err := json.Unmarshal(body, &resp)
@@ -417,7 +417,7 @@ func checkForEvents(c config, eventFound chan bool) {
 			}
 
 			if allFinished {
-				eventFound<-true
+				eventFound <- true
 			}
 		}
 	}
@@ -443,9 +443,9 @@ func deletePolicyMonitors(c config) {
 	policyUrl := c.adminApiUrl + "api/policies/monitors/"
 	monitorUrl := c.adminApiUrl + "api/policy-monitors/"
 
-	for page := 0; ;page += 1 {
+	for page := 0; ; page += 1 {
 		pageStr := fmt.Sprintf("?page=%d", page)
-		body := doReq("GET", policyUrl + pageStr,
+		body := doReq("GET", policyUrl+pageStr,
 			"", "getting all policy monitors", c.adminToken)
 		var resp GetPoliciesResp
 		err := json.Unmarshal(body, &resp)
@@ -455,7 +455,7 @@ func deletePolicyMonitors(c config) {
 			if i.Subscope != c.tenantId {
 				continue
 			}
-		
+
 			// delete each policy
 			_ = doReq("DELETE", policyUrl+i.ID, "", "deleting policy "+i.ID, c.adminToken)
 			// delete the corresponding monitor
