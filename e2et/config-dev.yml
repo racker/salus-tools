@@ -1,0 +1,15 @@
+mode: full
+regularId: <normal rackspace user name>
+tenantId: <rackspace tenant id>
+adminId: <rackspace admin user>
+publicApiUrl: <dev public api>
+adminApiUrl: <dev admin api>
+kafkaBrokers:
+  - <dev kafka broker>
+topic: <dev kafka topic>
+certFile: <kafka client cert file>
+caFile: <kafka ca file>
+keyFile: <kafka client key file>
+identityUrl: <keystone/identity url>
+authUrl: <dev auth service url>
+ambassadorAddress: <dev ambassador address>
