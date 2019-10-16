@@ -120,7 +120,7 @@ func main() {
 	createMonitors(c)
 	deletePolicyMonitors(c)
 	createPolicyMonitor(c)
-//	gbj checkPresenceMonitor(c)
+	checkPresenceMonitor(c)
 	log.Println("looking for events:")
 	select {
 	case <-eventFound:
@@ -398,7 +398,8 @@ func checkForEvents(c config, eventFound chan bool) {
 	for {
 		m, err := r.ReadMessage(context.Background())
 		checkErr(err, "reading kafka")
-		log.Printf("message at topic/partition/offset %v/%v/%v: %s = %s\n", m.Topic, m.Partition, m.Offset, string(m.Key), string(m.Value))
+		log.Printf("message at topic/partition/offset %v/%v/%v: %s = %s\n",
+			m.Topic, m.Partition, m.Offset, string(m.Key), string(m.Value))
 		s := string(m.Value)
 		if strings.Contains(s, c.resourceId) {
 			if strings.Contains(s, "net_response") {
@@ -429,18 +430,12 @@ func createMonitors(c config) {
 	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/monitors/"
 	data := fmt.Sprintf(netMonitorData, runtime.GOOS, c.privateZoneId, c.port)
 	_ = doReq("POST", url, data, "creating net monitor", c.regularToken)
-
-	if c.mode != "local" {
-		adminUrl := c.adminApiUrl + "api/policy-monitors"
-		data = fmt.Sprintf(httpMonitorData, runtime.GOOS, c.publicZoneId, c.port)
-		_ = doReq("POST", adminUrl, data, "creating http monitor", c.adminToken)
-	}
 	log.Println("monitors created")
 
 }
 
 func deletePolicyMonitors(c config) {
-	// policy monitors require public pollers which local envs don't have
+	// NOTE: Figure out why this doesn't work with private pollers
 	if c.mode == "local" {
 		return
 	}
@@ -473,7 +468,7 @@ func deletePolicyMonitors(c config) {
 }
 
 func createPolicyMonitor(c config) {
-	// policy monitors require public pollers which local envs don't have
+	// NOTE: Figure out why this doesn't work with private pollers
 	if c.mode == "local" {
 		return
 	}
