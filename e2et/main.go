@@ -153,7 +153,19 @@ func initEnvoy(c config, releaseId string) (cmd *exec.Cmd) {
 	checkErr(err, "creating envoy template")
 	err = f.Close()
 	checkErr(err, "closing envoy config file: "+configFileName)
-	cmd = exec.Command(os.Getenv("GOPATH")+"/bin/telemetry-envoy", "run", "--config="+configFileName)
+	var tarballURL string
+	if runtime.GOOS == "darwin" {
+		tarballURL = "https://github.com/racker/salus-telemetry-envoy/releases/download/0.13.0/telemetry-envoy_0.13.0_Darwin_x86_64.tar.gz"
+	} else {
+		tarballURL = "https://github.com/racker/salus-telemetry-envoy/releases/download/0.13.0/telemetry-envoy_0.13.0_Linux_x86_64.tar.gz"
+	}
+	cmd = exec.Command("curl", "-L", "-o", c.dir+"/envoy.tar.gz", tarballURL)
+	err = cmd.Run();
+	checkErr(err, "downloading tar")
+	cmd = exec.Command("tar", "-xf", c.dir+"/envoy.tar.gz", "-C", c.dir)
+	err = cmd.Run();
+	checkErr(err, "decompressing tarball")
+	cmd = exec.Command(c.dir+"/telemetry-envoy", "run", "--config="+configFileName)
 	cmd.Dir = c.dir
 	cmd.Stdout, err = os.Create(c.dir + "/envoyStdout.log")
 	checkErr(err, "redirecting stdout")
@@ -355,6 +367,8 @@ func checkForEvents(c config, eventFound chan bool) {
 	var r *kafka.Reader
 	finishedMap := make(map[string]bool)
 	finishedMap["net"] = false
+//gbj remove	
+finishedMap["http"] = false
 	if c.mode == "local" {
 		r = kafka.NewReader(kafka.ReaderConfig{
 			Brokers:  c.kafkaBrokers,
@@ -428,6 +442,9 @@ func createMonitors(c config) {
 	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/monitors/"
 	data := fmt.Sprintf(netMonitorData, runtime.GOOS, c.privateZoneId, c.port)
 	_ = doReq("POST", url, data, "creating net monitor", c.regularToken)
+//gbj remove
+	data = fmt.Sprintf(httpMonitorData, runtime.GOOS, c.privateZoneId)
+	_ = doReq("POST", url, data, "creating http monitor", c.regularToken)
 	log.Println("monitors created")
 
 }
