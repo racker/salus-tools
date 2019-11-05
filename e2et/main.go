@@ -44,26 +44,24 @@ import (
 func initConfig() config {
 	replacer := strings.NewReplacer(".", "_", "-", "_")
 	viper.SetEnvKeyReplacer(replacer)
-	viper.SetEnvPrefix("E2ET")
+	viper.SetEnvPrefix("e2et")
 	viper.AutomaticEnv() // read in environment variables that match
 
 	cfgFile := flag.String("config", "config.yml", "config file")
 	flag.Parse()
 	viper.SetConfigFile(*cfgFile)
 	err := viper.ReadInConfig()
-	checkErr(err, "Config file not found "+*cfgFile)
-	log.Println("loaded: " + *cfgFile)
 	var c config
 	c.mode = viper.GetString("mode")
 	c.currentUUID = uuid.NewV4()
 	c.id = strings.Replace(c.currentUUID.String(), "-", "", -1)
 	c.privateZoneId = "privateZone_" + c.id
 	c.resourceId = "resourceId_" + c.id
-	c.tenantId = viper.GetString("tenantId")
-	c.publicApiUrl = viper.GetString("publicApiUrl")
-	c.adminApiUrl = viper.GetString("adminApiUrl")
+	c.tenantId = viper.GetString("tenant.id")
+	c.publicApiUrl = viper.GetString("public.api.url")
+	c.adminApiUrl = viper.GetString("admin.api.url")
 	c.agentReleaseUrl = c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/agent-releases"
-	certDir := viper.GetString("certDir")
+	certDir := viper.GetString("cert.dir")
 
 	if !strings.HasPrefix(certDir, "/") {
 		wd, err := os.Getwd()
@@ -71,24 +69,24 @@ func initConfig() config {
 		certDir = path.Join(wd, certDir)
 	}
 	c.certDir = certDir
-	c.regularId = viper.GetString("regularId")
-	c.adminId = viper.GetString("adminId")
+	c.regularId = viper.GetString("regular.id")
+	c.adminId = viper.GetString("admin.id")
 	dir, err := ioutil.TempDir("", "e2et")
 	checkErr(err, "error creating temp dir")
 	c.dir = dir
-	c.kafkaBrokers = viper.GetStringSlice("kafkaBrokers")
-	c.eventTopic = viper.GetString("eventTopic")
-	c.identityUrl = viper.GetString("identityUrl")
-	c.authUrl = viper.GetString("authUrl")
-	c.ambassadorAddress = viper.GetString("ambassadorAddress")
+	c.kafkaBrokers = strings.Split(viper.GetString("kafka.brokers"), ",")
+	c.eventTopic = viper.GetString("event.topic")
+	c.identityUrl = viper.GetString("identity.url")
+	c.authUrl = viper.GetString("auth.url")
+	c.ambassadorAddress = viper.GetString("ambassador.address")
 	c.port = "8222"
 	c.publicZoneId = "public/us_central_1"
-	c.certFile = viper.GetString("certFile")
-	c.keyFile = viper.GetString("keyFile")
-	c.caFile = viper.GetString("caFile")
-	c.regularApiKey = os.Getenv("E2ET_REGULAR_API_KEY")
-	c.adminApiKey = os.Getenv("E2ET_ADMIN_API_KEY")
-	c.adminPassword = os.Getenv("E2ET_ADMIN_PASSWORD")
+	c.certFile = viper.GetString("cert.file")
+	c.keyFile = viper.GetString("key.file")
+	c.caFile = viper.GetString("ca.file")
+	c.regularApiKey = viper.GetString("regular.api.key")
+	c.adminApiKey = viper.GetString("admin.api.key")
+	c.adminPassword = viper.GetString("admin.password")
 	c.regularToken = getToken(c, c.regularId, c.regularApiKey, "")
 	c.adminToken = getToken(c, c.adminId, c.adminApiKey, c.adminPassword)
 	return c
@@ -125,7 +123,7 @@ func main() {
 	select {
 	case <-eventFound:
 		log.Println("events returned from kafka successfully")
-	case <-time.After(10 * time.Minute):
+	case <-time.After(5 * time.Minute):
 		log.Fatal("Timed out waiting for events")
 	}
 
@@ -477,7 +475,7 @@ func createPolicyMonitor(c config) {
 	monitorUrl := c.adminApiUrl + "api/policy-monitors/"
 
 	// Now create new policy monitor
-	data := fmt.Sprintf(httpMonitorData, runtime.GOOS, c.publicZoneId, c.port)
+	data := fmt.Sprintf(httpMonitorData, runtime.GOOS, c.publicZoneId)
 	body := doReq("POST", monitorUrl, data, "creating policy monitor", c.adminToken)
 	var resp CreatePolicyMonitorResp
 	err := json.Unmarshal(body, &resp)

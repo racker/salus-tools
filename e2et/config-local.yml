@@ -1,8 +1,8 @@
 mode: local
-tenantId: aaaaaa
-publicApiUrl: http://localhost:8080/
-adminApiUrl: http://localhost:8888/
-certDir: ../../dev/certs
-kafkaBrokers:
+tenant.id: aaaaaa
+public.api.url: http://localhost:8080/
+admin.api.url: http://localhost:8888/
+cert.dir: ../../dev/certs
+kafka.brokers:
   - localhost:9092
-eventTopic: salus.events.json
+event.topic: salus.events.json

@@ -98,7 +98,7 @@ const netMonitorData = `{
   "labelSelector": {
     "agent_discovered_os": "%s"
   },
-  "interval": "PT30S",
+  "interval": "PT60S",
   "details": {
     "type": "remote",
     "monitoringZones": ["%s"],
@@ -113,13 +113,13 @@ const httpMonitorData = `{
   "labelSelector": {
     "agent_discovered_os": "%s"
   },
-  "interval": "PT30S",
+  "interval": "PT60S",
   "details": {
     "type": "remote",
     "monitoringZones": ["%s"],
     "plugin": {
       "type": "http_response",
-      "address": "http://localhost:%s",
+      "address": "http://l:80",
       "responseTimeout": "3s",
       "method": "GET"
     }

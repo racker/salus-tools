@@ -1,3 +1,4 @@
+#!/bin/bash
 export E2ET_MODE=local
 export E2ET_TENANT_ID=aaaaaa
 export E2ET_PUBLIC_API_URL=http://localhost:8080/
