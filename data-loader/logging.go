@@ -25,10 +25,10 @@ import (
 )
 
 var logger *zap.Logger
+var loggerSetup sync.Once
 
 func SetupLogger(debug bool) {
-	var once sync.Once
-	once.Do(func() {
+	loggerSetup.Do(func() {
 		var err error
 		if debug {
 			logger, err = zap.NewDevelopment()
@@ -42,13 +42,7 @@ func SetupLogger(debug bool) {
 }
 
 func CloseLogger() {
-	var once sync.Once
-	once.Do(func() {
-		err := logger.Sync()
-		if err != nil {
-			log.Fatalf("failed to sync zap logger: %v", err)
-		}
-	})
+	_ = logger.Sync()
 }
 
 func CreateLogger(scope interface{}) *zap.SugaredLogger {

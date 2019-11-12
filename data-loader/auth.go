@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"go.uber.org/zap"
 	"io"
 	"net/http"
 	"net/url"
@@ -48,8 +49,20 @@ type IdentityAuthenticator struct {
 	Password    string
 	Apikey      string
 
+	log *zap.SugaredLogger
+
 	token           string
 	tokenExpiration time.Time
+}
+
+func NewIdentityAuthenticator(log *zap.SugaredLogger, identityUrl string, username string, password string, apikey string) *IdentityAuthenticator {
+	return &IdentityAuthenticator{
+		IdentityUrl: identityUrl,
+		Username:    username,
+		Password:    password,
+		Apikey:      apikey,
+		log:         log.Named("auth.identity"),
+	}
 }
 
 type identityAuthApikeyReq struct {
@@ -139,6 +152,9 @@ func (a *IdentityAuthenticator) authenticate() error {
 	}
 	request.Header.Set("Content-Type", "application/json")
 
+	a.log.Debugw("authenticating with Identity",
+		"user", a.Username,
+		"endpoint", a.IdentityUrl)
 	postResp, err := http.DefaultClient.Do(request)
 	if err != nil {
 		return fmt.Errorf("failed to issue token request: %w", err)

@@ -18,7 +18,6 @@ package main
 
 import (
 	"github.com/alexflint/go-arg"
-	"github.com/sirupsen/logrus"
 	"os"
 	"strings"
 )
@@ -47,41 +46,39 @@ func main() {
 	SetupLogger(args.Debug)
 	defer CloseLogger()
 
+	log := CreateLogger("main")
+
 	var sourceContent SourceContent
 	if args.FromLocalDir != "" {
-		sourceContent = NewSourceContentFromDir(args.FromLocalDir)
+		sourceContent = NewSourceContentFromDir(log, args.FromLocalDir)
 	} else if args.FromGitRepo != "" {
-		sourceContent = NewSourceContentFromGit(args.FromGitRepo, args.FromGitSha, args.GithubToken)
+		sourceContent = NewSourceContentFromGit(log, args.FromGitRepo, args.FromGitSha, args.GithubToken)
 	} else {
 		argsParser.WriteHelp(os.Stderr)
-		logrus.Fatal("source content needs to be configured")
+		log.Fatal("source content needs to be configured")
 	}
 
 	//noinspection GoNilness
 	sourceContentPath, err := sourceContent.Prepare()
 	if err != nil {
-		logrus.WithError(err).Fatal("failed to prepare source content")
+		log.Fatalw("failed to prepare source content", "err", err)
 	}
 	//noinspection GoNilness
 	defer sourceContent.Cleanup()
 
 	var clientAuth *IdentityAuthenticator
 	if !strings.Contains(args.AdminUrl, "localhost") {
-		clientAuth = &IdentityAuthenticator{
-			IdentityUrl: args.IdentityUrl,
-			Username:    args.IdentityUsername,
-			Password:    args.IdentityPassword,
-			Apikey:      args.IdentityApiKey,
-		}
+		clientAuth = NewIdentityAuthenticator(log,
+			args.IdentityUrl, args.IdentityUsername, args.IdentityPassword, args.IdentityApiKey)
 	}
 
-	loader, err := NewLoader(clientAuth, args.AdminUrl, sourceContentPath)
+	loader, err := NewLoader(log, clientAuth, args.AdminUrl, sourceContentPath)
 	if err != nil {
-		logrus.WithError(err).Fatal("failed to create loader")
+		log.Fatalw("failed to create loader", "err", err)
 	}
 
 	err = loader.LoadAll()
 	if err != nil {
-		logrus.WithError(err).Fatal("failed to perform all loading")
+		log.Fatalw("failed to perform all loading", "err", err)
 	}
 }

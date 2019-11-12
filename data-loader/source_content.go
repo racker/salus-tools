@@ -18,7 +18,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 	"gopkg.in/src-d/go-git.v4"
 	"gopkg.in/src-d/go-git.v4/plumbing"
 	"gopkg.in/src-d/go-git.v4/plumbing/transport"
@@ -34,20 +34,21 @@ type SourceContent interface {
 	Cleanup()
 }
 
-func NewSourceContentFromDir(dir string) SourceContent {
+func NewSourceContentFromDir(log *zap.SugaredLogger, dir string) SourceContent {
 	return &dirSourceContent{
+		log: log.Named("sourceContent.dir"),
 		dir: dir,
 	}
 }
 
 type dirSourceContent struct {
 	dir string
+	log *zap.SugaredLogger
 }
 
 func (c *dirSourceContent) Prepare() (string, error) {
-	logrus.
-		WithField("dir", c.dir).
-		Info("using source content from local directory")
+	c.log.Infow("using source content from local directory",
+		"dir", c.dir)
 	// just return the configured directory
 	return c.dir, nil
 }
@@ -56,8 +57,9 @@ func (c *dirSourceContent) Cleanup() {
 	// no cleanup needed
 }
 
-func NewSourceContentFromGit(repository string, sha string, githubToken string) SourceContent {
+func NewSourceContentFromGit(log *zap.SugaredLogger, repository string, sha string, githubToken string) SourceContent {
 	return &gitSourceContent{
+		log:         log.Named("sourceContent.git"),
 		repository:  repository,
 		sha:         sha,
 		githubToken: githubToken,
@@ -65,6 +67,7 @@ func NewSourceContentFromGit(repository string, sha string, githubToken string) 
 }
 
 type gitSourceContent struct {
+	log         *zap.SugaredLogger
 	repository  string
 	sha         string
 	workingDir  string
@@ -114,9 +117,9 @@ func (c *gitSourceContent) Prepare() (string, error) {
 		c.sha = headRef.Hash().String()
 	}
 
-	logrus.WithField("repository", c.repository).
-		WithField("sha", c.sha).
-		Info("cloned source content")
+	c.log.Infow("cloned source content",
+		"repo", c.repository,
+		"sha", c.sha)
 
 	return c.workingDir, nil
 }

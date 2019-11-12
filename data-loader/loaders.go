@@ -19,7 +19,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 	"net/url"
 	"strconv"
 	"time"
@@ -46,11 +46,12 @@ type PagedContent struct {
 }
 
 type Loader struct {
+	log               *zap.SugaredLogger
 	restClient        *RestClient
 	sourceContentPath string
 }
 
-func NewLoader(identityAuthenticator *IdentityAuthenticator, adminUrl string, sourceContentPath string) (*Loader, error) {
+func NewLoader(log *zap.SugaredLogger, identityAuthenticator *IdentityAuthenticator, adminUrl string, sourceContentPath string) (*Loader, error) {
 	parsedAdminUrl, err := url.Parse(adminUrl)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse adminUrl %s: %w", adminUrl, err)
@@ -63,6 +64,7 @@ func NewLoader(identityAuthenticator *IdentityAuthenticator, adminUrl string, so
 	}
 
 	return &Loader{
+		log:               log.Named("loader"),
 		restClient:        restClient,
 		sourceContentPath: sourceContentPath,
 	}, nil
@@ -91,15 +93,17 @@ func (l *Loader) load(definition LoaderDefinition) error {
 		}
 	}
 
-	logrus.
-		WithField("content", content).
-		WithField("definition", definition.Name).
-		Info("Loaded exiting content")
+	l.log.Infow("Loaded existing content",
+		"content", content,
+		"definition", definition.Name)
 
 	return nil
 }
 
 func (l *Loader) loadAllPages(definition LoaderDefinition) ([]interface{}, error) {
+	l.log.Debugw("loading all pages for definition",
+		"definition", definition)
+
 	var content []interface{}
 
 	for page := 0; ; page++ {
@@ -107,7 +111,7 @@ func (l *Loader) loadAllPages(definition LoaderDefinition) ([]interface{}, error
 		query.Set("page", strconv.Itoa(page))
 
 		var pagedContent PagedContent
-		err := l.restClient.Exchange(context.Background(), "GET", definition.GetterPath+"WRONG", query,
+		err := l.restClient.Exchange(context.Background(), "GET", definition.GetterPath, query,
 			"", nil,
 			JsonType, &pagedContent)
 
