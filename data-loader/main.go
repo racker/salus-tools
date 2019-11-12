@@ -18,11 +18,24 @@ package main
 
 import (
 	"github.com/alexflint/go-arg"
+	"github.com/iancoleman/strcase"
 	"os"
 	"strings"
 )
 
+type KebabLongSnakeEnvRenamer struct{}
+
+func (KebabLongSnakeEnvRenamer) RenameLong(field string) string {
+	return strcase.ToKebab(field)
+}
+
+func (KebabLongSnakeEnvRenamer) RenameEnv(field string) string {
+	return strcase.ToScreamingSnake(field)
+}
+
 var args struct {
+	KebabLongSnakeEnvRenamer
+
 	FromGitRepo  string
 	FromGitSha   string
 	FromLocalDir string
