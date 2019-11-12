@@ -40,13 +40,19 @@ type RestClientNext func(req *http.Request) (*http.Response, error)
 
 type RestClientInterceptor func(req *http.Request, next RestClientNext) (*http.Response, error)
 
-type FailedResponse struct {
+type FailedResponseError struct {
 	StatusCode int
+	Status     string
+	ConentType MimeType
 	Content    []byte
 }
 
-func (r *FailedResponse) Error() string {
-	return fmt.Sprintf("(%d) %s", r.StatusCode, string(r.Content))
+func (r *FailedResponseError) Error() string {
+	content := r.Content
+	if len(r.Content) > 100 {
+		content = r.Content[:100]
+	}
+	return fmt.Sprintf("%s body=[%s]", r.Status, string(content))
 }
 
 func NewRestClient() *RestClient {
@@ -59,9 +65,43 @@ func (c *RestClient) AddInterceptor(it RestClientInterceptor) {
 	c.interceptors.PushBack(it)
 }
 
-func (c *RestClient) Call(ctx context.Context, method string,
+type MimeType string
+
+const (
+	JsonType MimeType = "application/json"
+	TextType MimeType = "text/plain"
+	HtmlType MimeType = "text/html"
+)
+
+const (
+	HeaderContentType = "Content-Type"
+	HeaderAccept      = "Accept"
+)
+
+// Exchange prepares an HTTP request with optional JSON encoding,
+// sends the request, and optionally processes the response with JSON decoding.
+//
+// The given ctx is used to build a timeout context for the overall exchange and is typically
+// just context.Background().
+//
+// The urlIn is either parsed relative to the BaseUrl configured on the client instance or parsed as is.
+//
+// If given, the query values are encoded into the final request URL.
+//
+// If body is non-nil, it will be used as the request payload.
+// If body is a []byte, the content will be used as is,
+// but any other type combined with a contentType of JsonType will be encoded as JSON.
+//
+// If respOut is non-nil, the response body will be placed at the given location. If a *string or *byte.Buffer
+// is given, then the raw response body is used. Any other type combined with an accept of JsonType will
+// be decoded as JSON.
+//
+// If the far-end responded with a non-2xx status code, then the returned error will be a
+// FailedResponseError, which conveys the status code and response body's content.
+func (c *RestClient) Exchange(ctx context.Context, method string,
 	urlIn string, query url.Values,
-	body interface{}, respOut interface{}) error {
+	contentType MimeType, body interface{},
+	accept MimeType, respOut interface{}) error {
 
 	var reqUrl *url.URL
 	if c.BaseUrl != nil {
@@ -87,9 +127,7 @@ func (c *RestClient) Call(ctx context.Context, method string,
 		bodyReader = nil
 	} else if b, ok := body.([]byte); ok {
 		bodyReader = bytes.NewBuffer(b)
-	} else if s, ok := body.(string); ok {
-		bodyReader = bytes.NewBufferString(s)
-	} else {
+	} else if contentType == JsonType {
 		var buffer bytes.Buffer
 		encoder := json.NewEncoder(&buffer)
 		err := encoder.Encode(body)
@@ -97,6 +135,8 @@ func (c *RestClient) Call(ctx context.Context, method string,
 			return fmt.Errorf("failed to encode body: %w", err)
 		}
 		bodyReader = &buffer
+	} else {
+		return fmt.Errorf("non-json contentType only supports string or []byte")
 	}
 
 	timeoutCtx, cancelFunc := context.WithTimeout(ctx, c.timeout())
@@ -105,6 +145,13 @@ func (c *RestClient) Call(ctx context.Context, method string,
 	req, err := http.NewRequestWithContext(timeoutCtx, method, reqUrl.String(), bodyReader)
 	if err != nil {
 		return fmt.Errorf("failed to setup request: %w", err)
+	}
+
+	if contentType != "" {
+		req.Header.Set(HeaderContentType, string(contentType))
+	}
+	if accept != "" {
+		req.Header.Set(HeaderAccept, string(accept))
 	}
 
 	resp, err := c.doRequest(req, c.interceptors.Front())
@@ -116,7 +163,12 @@ func (c *RestClient) Call(ctx context.Context, method string,
 		var buffer bytes.Buffer
 		_, _ = io.Copy(&buffer, resp.Body)
 		_ = resp.Body.Close()
-		return &FailedResponse{StatusCode: resp.StatusCode, Content: buffer.Bytes()}
+		return &FailedResponseError{
+			StatusCode: resp.StatusCode,
+			Status:     resp.Status,
+			ConentType: MimeType(resp.Header.Get(HeaderContentType)),
+			Content:    buffer.Bytes(),
+		}
 	}
 
 	if rs, ok := respOut.(*string); ok {
@@ -131,13 +183,15 @@ func (c *RestClient) Call(ctx context.Context, method string,
 		if err != nil {
 			return fmt.Errorf("failed to read response body: %w", err)
 		}
-	} else if respOut != nil {
+	} else if respOut != nil && accept == JsonType {
 		decoder := json.NewDecoder(resp.Body)
 		err := decoder.Decode(respOut)
 		if err != nil {
 			_ = resp.Body.Close()
 			return fmt.Errorf("failed to decode response: %w", err)
 		}
+	} else if respOut != nil {
+		return fmt.Errorf("non-json response can only be placed into *string or *bytes.Buffer")
 	}
 
 	err = resp.Body.Close()

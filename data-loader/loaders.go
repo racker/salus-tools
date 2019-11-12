@@ -107,8 +107,9 @@ func (l *Loader) loadAllPages(definition LoaderDefinition) ([]interface{}, error
 		query.Set("page", strconv.Itoa(page))
 
 		var pagedContent PagedContent
-		err := l.restClient.Call(context.Background(), "GET", definition.GetterPath, query,
-			nil, &pagedContent)
+		err := l.restClient.Exchange(context.Background(), "GET", definition.GetterPath+"WRONG", query,
+			"", nil,
+			JsonType, &pagedContent)
 
 		if err != nil {
 			return nil, fmt.Errorf("failed to get page %d of %s: %w", page, definition.Name, err)
