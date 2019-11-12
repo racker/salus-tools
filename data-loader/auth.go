@@ -80,17 +80,16 @@ type identityAuthResp struct {
 	}
 }
 
-func (a *IdentityAuthenticator) PrepareRequest(req *http.Request) error {
-
+func (a *IdentityAuthenticator) PrepareRequest(req *http.Request, next RestClientNext) (*http.Response, error) {
 	if time.Now().After(a.tokenExpiration) {
 		if err := a.authenticate(); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	req.Header.Set("x-auth-token", a.token)
 
-	return nil
+	return next(req)
 }
 
 func (a *IdentityAuthenticator) authenticate() error {

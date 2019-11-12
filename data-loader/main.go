@@ -36,11 +36,16 @@ var args struct {
 	IdentityApiKey   string `arg:"env"`
 
 	AdminUrl string `arg:"required,env"`
+
+	Debug bool
 }
 
 func main() {
 
 	argsParser := arg.MustParse(&args)
+
+	SetupLogger(args.Debug)
+	defer CloseLogger()
 
 	var sourceContent SourceContent
 	if args.FromLocalDir != "" {
@@ -60,10 +65,8 @@ func main() {
 	//noinspection GoNilness
 	defer sourceContent.Cleanup()
 
-	var clientAuth ClientAuthenticator
-	if strings.Contains(args.AdminUrl, "localhost") {
-		clientAuth = &DisabledAuthenticator{}
-	} else {
+	var clientAuth *IdentityAuthenticator
+	if !strings.Contains(args.AdminUrl, "localhost") {
 		clientAuth = &IdentityAuthenticator{
 			IdentityUrl: args.IdentityUrl,
 			Username:    args.IdentityUsername,

@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/sirupsen/logrus"
-	"net/http"
 	"net/url"
 	"strconv"
 	"time"
@@ -47,21 +46,25 @@ type PagedContent struct {
 }
 
 type Loader struct {
-	clientAuthenticator ClientAuthenticator
-	sourceContentPath   string
-	adminUrl            *url.URL
+	restClient        *RestClient
+	sourceContentPath string
 }
 
-func NewLoader(clientAuthenticator ClientAuthenticator, adminUrl string, sourceContentPath string) (*Loader, error) {
+func NewLoader(identityAuthenticator *IdentityAuthenticator, adminUrl string, sourceContentPath string) (*Loader, error) {
 	parsedAdminUrl, err := url.Parse(adminUrl)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse adminUrl %s: %w", adminUrl, err)
 	}
 
+	restClient := NewRestClient()
+	restClient.BaseUrl = parsedAdminUrl
+	if identityAuthenticator != nil {
+		restClient.AddInterceptor(identityAuthenticator.PrepareRequest)
+	}
+
 	return &Loader{
-		clientAuthenticator: clientAuthenticator,
-		sourceContentPath:   sourceContentPath,
-		adminUrl:            parsedAdminUrl,
+		restClient:        restClient,
+		sourceContentPath: sourceContentPath,
 	}, nil
 }
 
@@ -77,16 +80,12 @@ func (l *Loader) LoadAll() error {
 
 func (l *Loader) load(definition LoaderDefinition) error {
 
-	getterUrl, err := l.adminUrl.Parse(definition.GetterPath)
-	if err != nil {
-		return fmt.Errorf("failed to build getter url: %w", err)
-	}
-
 	var content []interface{}
 	if definition.NonPaged {
 		// todo
 	} else {
-		content, err = l.loadAllPages(definition, getterUrl)
+		var err error
+		content, err = l.loadAllPages(definition)
 		if err != nil {
 			return fmt.Errorf("failed to load all pages: %w", err)
 		}
@@ -100,39 +99,19 @@ func (l *Loader) load(definition LoaderDefinition) error {
 	return nil
 }
 
-func (l *Loader) loadAllPages(definition LoaderDefinition, getterUrl *url.URL) ([]interface{}, error) {
+func (l *Loader) loadAllPages(definition LoaderDefinition) ([]interface{}, error) {
 	var content []interface{}
 
 	for page := 0; ; page++ {
-		pageUrl := *getterUrl
 		query := make(url.Values)
 		query.Set("page", strconv.Itoa(page))
-		pageUrl.RawQuery = query.Encode()
-
-		reqCtx, _ := context.WithDeadline(context.Background(), time.Now().Add(getterTimeout))
-		request, err := http.NewRequestWithContext(reqCtx, "GET", pageUrl.String(), nil)
-		if err != nil {
-			return nil, fmt.Errorf("failed to build page request: %w", err)
-		}
-
-		err = l.clientAuthenticator.PrepareRequest(request)
-		if err != nil {
-			return nil, fmt.Errorf("failed to prepare auth for page request: %w", err)
-		}
-
-		response, err := http.DefaultClient.Do(request)
-		if err != nil {
-			return nil, fmt.Errorf("failed to submit page request: %w", err)
-		}
-
-		if response.StatusCode != 200 {
-			return nil, newFailedResponseError("page request failed", request, response)
-		}
 
 		var pagedContent PagedContent
-		err = decodeResponse(request, response, &pagedContent)
+		err := l.restClient.Call(context.Background(), "GET", definition.GetterPath, query,
+			nil, &pagedContent)
+
 		if err != nil {
-			return nil, fmt.Errorf("failed to decode page %d of content: %w", err)
+			return nil, fmt.Errorf("failed to get page %d of %s: %w", page, definition.Name, err)
 		}
 
 		content = append(content, pagedContent.Content)
