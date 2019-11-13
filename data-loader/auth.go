@@ -17,12 +17,10 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"go.uber.org/zap"
 	"net/http"
-	"net/url"
 	"time"
 )
 
@@ -48,13 +46,11 @@ func NewIdentityAuthenticator(log *zap.SugaredLogger, identityUrl string, userna
 		return nil, errors.New("password or Apikey is required")
 	}
 
-	baseIdentityUrl, err := url.Parse(identityUrl)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse given identityUrl: %w", err)
-	}
-
 	restClient := NewRestClient()
-	restClient.BaseUrl = baseIdentityUrl
+	err := restClient.SetBaseUrl(identityUrl)
+	if err != nil {
+		return nil, fmt.Errorf("invalid Identity URL: %w", err)
+	}
 	restClient.Timeout = authTimeout
 
 	return &IdentityAuthenticator{
@@ -126,7 +122,7 @@ func (a *IdentityAuthenticator) authenticate() error {
 	a.log.Debugw("authenticating with Identity",
 		"user", a.username,
 		"endpoint", a.restClient.BaseUrl)
-	err := a.restClient.Exchange(context.Background(), "POST", "/v2.0/tokens", nil,
+	err := a.restClient.Exchange("POST", "/v2.0/tokens", nil,
 		NewJsonEntity(req), NewJsonEntity(&resp))
 	if err != nil {
 		return fmt.Errorf("failed to issue token request: %w", err)

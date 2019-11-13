@@ -86,6 +86,15 @@ func (c *RestClient) AddInterceptor(it RestClientInterceptor) {
 	c.interceptors.PushBack(it)
 }
 
+func (c *RestClient) SetBaseUrl(rawurl string) error {
+	url, err := url.Parse(rawurl)
+	if err != nil {
+		return fmt.Errorf("failed to parse given base url: %w", err)
+	}
+	c.BaseUrl = url
+	return nil
+}
+
 type MimeType string
 
 const (
@@ -112,9 +121,6 @@ func NewJsonEntity(content interface{}) *RestEntity {
 // Exchange prepares an HTTP request with optional JSON encoding,
 // sends the request, and optionally processes the response with JSON decoding.
 //
-// The given ctx is used to build a timeout context for the overall exchange and is typically
-// just context.Background().
-//
 // The urlIn is either parsed relative to the BaseUrl configured on the client instance or parsed as is.
 //
 // If given, the query values are encoded into the final request URL.
@@ -129,7 +135,16 @@ func NewJsonEntity(content interface{}) *RestEntity {
 //
 // If the far-end responded with a non-2xx status code, then the returned error will be a
 // FailedResponseError, which conveys the status code and response body's content.
-func (c *RestClient) Exchange(ctx context.Context, method string,
+func (c *RestClient) Exchange(method string,
+	urlIn string, query url.Values,
+	reqIn *RestEntity,
+	respOut *RestEntity) error {
+	return c.ExchangeWithContext(nil, method, urlIn, query, reqIn, respOut)
+}
+
+// ExchangeWithContext is the same as Exchange, but allows for a context to be provided
+// to derive the request timeout context.
+func (c *RestClient) ExchangeWithContext(ctx context.Context, method string,
 	urlIn string, query url.Values,
 	reqIn *RestEntity,
 	respOut *RestEntity) error {
@@ -144,6 +159,9 @@ func (c *RestClient) Exchange(ctx context.Context, method string,
 		return err
 	}
 
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	timeoutCtx, cancelFunc := context.WithTimeout(ctx, c.timeout())
 	defer cancelFunc()
 

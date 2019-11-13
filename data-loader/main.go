@@ -40,7 +40,7 @@ var args struct {
 	FromGitSha   string
 	FromLocalDir string
 
-	GithubToken string `arg:"env:GITHUB_TOKEN"`
+	GithubToken string `arg:"env"`
 
 	IdentityUrl      string `default:"https://identity.api.rackspacecloud.com" arg:"env"`
 	IdentityUsername string `arg:"env"`
@@ -93,7 +93,7 @@ func main() {
 		log.Fatalw("failed to create loader", "err", err)
 	}
 
-	err = loader.LoadAll()
+	err = loader.LoadAll(sourceContentPath)
 	if err != nil {
 		log.Fatalw("failed to perform all loading", "err", err)
 	}
