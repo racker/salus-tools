@@ -36,20 +36,20 @@ func (KebabLongSnakeEnvRenamer) RenameEnv(field string) string {
 var args struct {
 	KebabLongSnakeEnvRenamer
 
-	FromGitRepo  string
-	FromGitSha   string
-	FromLocalDir string
+	FromGitRepo  string `help:"when given, enables data loading from a cloned git repo at the given URL"`
+	FromGitSha   string `help:"when using a git repo, a specific commit SHA can be checked out"`
+	FromLocalDir string `help:"for development, an existing directory can be referenced for data loading"`
 
-	GithubToken string `arg:"env"`
+	GithubToken string `arg:"env" help:"when using a private Github repo, an access token must be provided"`
 
-	IdentityUrl      string `default:"https://identity.api.rackspacecloud.com" arg:"env"`
-	IdentityUsername string `arg:"env"`
-	IdentityPassword string `arg:"env"`
-	IdentityApikey   string `arg:"env"`
+	IdentityUrl      string `default:"https://identity.api.rackspacecloud.com" arg:"env" help:"The base URL of the Identity endpoint to use for authentication"`
+	IdentityUsername string `arg:"env" help:"username of a user in Identity that has access to the Salus Admin API"`
+	IdentityPassword string `arg:"env" help:"if apikey is not provided, the password for the given user"`
+	IdentityApikey   string `arg:"env" help:"if password is not provided, the apikey for the given user"`
 
-	AdminUrl string `arg:"required,env"`
+	AdminUrl string `arg:"required,env" help:"The base URL of the Salus Admin API endpoint to use"`
 
-	Debug bool
+	Debug bool `help:"Enables debug level logging"`
 }
 
 func main() {
