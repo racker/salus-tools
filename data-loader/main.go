@@ -45,7 +45,7 @@ var args struct {
 	IdentityUrl      string `default:"https://identity.api.rackspacecloud.com" arg:"env"`
 	IdentityUsername string `arg:"env"`
 	IdentityPassword string `arg:"env"`
-	IdentityApiKey   string `arg:"env"`
+	IdentityApikey   string `arg:"env"`
 
 	AdminUrl string `arg:"required,env"`
 
@@ -82,7 +82,7 @@ func main() {
 	var clientAuth *IdentityAuthenticator
 	if !strings.Contains(args.AdminUrl, "localhost") {
 		clientAuth = NewIdentityAuthenticator(log,
-			args.IdentityUrl, args.IdentityUsername, args.IdentityPassword, args.IdentityApiKey)
+			args.IdentityUrl, args.IdentityUsername, args.IdentityPassword, args.IdentityApikey)
 	}
 
 	loader, err := NewLoader(log, clientAuth, args.AdminUrl, sourceContentPath)

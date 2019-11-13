@@ -32,7 +32,7 @@ import (
 const authTimeout = 60 * time.Second
 
 type ClientAuthenticator interface {
-	// PrepareRequest takes a client request and injects authentication headers, etc
+	// Intercept takes a client request and injects authentication headers, etc
 	PrepareRequest(req *http.Request) error
 }
 
@@ -93,7 +93,7 @@ type identityAuthResp struct {
 	}
 }
 
-func (a *IdentityAuthenticator) PrepareRequest(req *http.Request, next RestClientNext) (*http.Response, error) {
+func (a *IdentityAuthenticator) Intercept(req *http.Request, next RestClientNext) (*http.Response, error) {
 	if time.Now().After(a.tokenExpiration) {
 		if err := a.authenticate(); err != nil {
 			return nil, err
