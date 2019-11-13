@@ -27,4 +27,11 @@ var loaderDefinitions = []LoaderDefinition{
 			"$.labels.agent_discovered_arch",
 		},
 	},
+	{
+		Name:    "monitor-translations",
+		ApiPath: "/api/monitor-translations",
+		UniqueFieldPaths: []string{
+			"$.name",
+		},
+	},
 }
