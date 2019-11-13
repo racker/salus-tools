@@ -41,19 +41,6 @@ func (l *LoaderDefinition) String() string {
 	return l.Name
 }
 
-var loaderDefinitions = []LoaderDefinition{
-	{
-		Name:    "agent-releases",
-		ApiPath: "/api/agent-releases",
-		UniqueFieldPaths: []string{
-			"$.type",
-			"$.version",
-			"$.labels.agent_discovered_os",
-			"$.labels.agent_discovered_arch",
-		},
-	},
-}
-
 type PagedContent struct {
 	Content []interface{}
 	Last    bool
