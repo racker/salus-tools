@@ -81,8 +81,11 @@ func main() {
 
 	var clientAuth *IdentityAuthenticator
 	if !strings.Contains(args.AdminUrl, "localhost") {
-		clientAuth = NewIdentityAuthenticator(log,
+		clientAuth, err = NewIdentityAuthenticator(log,
 			args.IdentityUrl, args.IdentityUsername, args.IdentityPassword, args.IdentityApikey)
+		if err != nil {
+			log.Fatalw("failed to setup Identity authenticator", "err", err)
+		}
 	}
 
 	loader, err := NewLoader(log, clientAuth, args.AdminUrl, sourceContentPath)

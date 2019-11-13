@@ -17,13 +17,10 @@
 package main
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"go.uber.org/zap"
-	"io"
 	"net/http"
 	"net/url"
 	"time"
@@ -31,38 +28,42 @@ import (
 
 const authTimeout = 60 * time.Second
 
-type ClientAuthenticator interface {
-	// Intercept takes a client request and injects authentication headers, etc
-	PrepareRequest(req *http.Request) error
-}
-
-type DisabledAuthenticator struct{}
-
-func (DisabledAuthenticator) PrepareRequest(req *http.Request) error {
-	// no-op
-	return nil
-}
-
 type IdentityAuthenticator struct {
-	IdentityUrl string
-	Username    string
-	Password    string
-	Apikey      string
+	username string
+	password string
+	apikey   string
 
-	log *zap.SugaredLogger
+	log        *zap.SugaredLogger
+	restClient *RestClient
 
 	token           string
 	tokenExpiration time.Time
 }
 
-func NewIdentityAuthenticator(log *zap.SugaredLogger, identityUrl string, username string, password string, apikey string) *IdentityAuthenticator {
-	return &IdentityAuthenticator{
-		IdentityUrl: identityUrl,
-		Username:    username,
-		Password:    password,
-		Apikey:      apikey,
-		log:         log.Named("auth.identity"),
+func NewIdentityAuthenticator(log *zap.SugaredLogger, identityUrl string, username string, password string, apikey string) (*IdentityAuthenticator, error) {
+	if username == "" {
+		return nil, errors.New("username is required")
 	}
+	if password == "" && apikey == "" {
+		return nil, errors.New("password or Apikey is required")
+	}
+
+	baseIdentityUrl, err := url.Parse(identityUrl)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse given identityUrl: %w", err)
+	}
+
+	restClient := NewRestClient()
+	restClient.BaseUrl = baseIdentityUrl
+	restClient.Timeout = authTimeout
+
+	return &IdentityAuthenticator{
+		username:   username,
+		password:   password,
+		apikey:     apikey,
+		log:        log.Named("auth.identity"),
+		restClient: restClient,
+	}, nil
 }
 
 type identityAuthApikeyReq struct {
@@ -106,73 +107,29 @@ func (a *IdentityAuthenticator) Intercept(req *http.Request, next RestClientNext
 }
 
 func (a *IdentityAuthenticator) authenticate() error {
-	if a.IdentityUrl == "" {
-		return errors.New("IdentityUrl is required")
-	}
-	if a.Username == "" {
-		return errors.New("Username is required")
-	}
-	if a.Password == "" && a.Apikey == "" {
-		return errors.New("Password or Apikey is required")
-	}
 
 	var req interface{}
-	if a.Apikey != "" {
+	if a.apikey != "" {
 		auth := &identityAuthApikeyReq{}
-		auth.Auth.Credentials.Username = a.Username
-		auth.Auth.Credentials.Apikey = a.Apikey
+		auth.Auth.Credentials.Username = a.username
+		auth.Auth.Credentials.Apikey = a.apikey
 		req = auth
 	} else {
 		auth := &identityAuthPasswordReq{}
-		auth.Auth.Credentials.Username = a.Username
-		auth.Auth.Credentials.Password = a.Password
+		auth.Auth.Credentials.Username = a.username
+		auth.Auth.Credentials.Password = a.password
 		req = auth
 	}
 
-	reqJson, err := json.Marshal(req)
-	if err != nil {
-		return fmt.Errorf("failed to marshal identity request: %w", err)
-	}
-
-	baseUrl, err := url.Parse(a.IdentityUrl)
-	if err != nil {
-		return fmt.Errorf("failed to parse Identity URL: %w", err)
-	}
-
-	reqUrl, err := baseUrl.Parse("/v2.0/tokens")
-	if err != nil {
-		return fmt.Errorf("failed to build tokens request URL: %w", err)
-	}
-
-	reqCtx, _ := context.WithDeadline(context.Background(), time.Now().Add(authTimeout))
-	request, err := http.NewRequestWithContext(reqCtx,
-		"POST", reqUrl.String(), bytes.NewBuffer(reqJson))
-	if err != nil {
-		return fmt.Errorf("failed to build auth request: %w", err)
-	}
-	request.Header.Set("Content-Type", "application/json")
+	var resp identityAuthResp
 
 	a.log.Debugw("authenticating with Identity",
-		"user", a.Username,
-		"endpoint", a.IdentityUrl)
-	postResp, err := http.DefaultClient.Do(request)
+		"user", a.username,
+		"endpoint", a.restClient.BaseUrl)
+	err := a.restClient.Exchange(context.Background(), "POST", "/v2.0/tokens", nil,
+		NewJsonEntity(req), NewJsonEntity(&resp))
 	if err != nil {
 		return fmt.Errorf("failed to issue token request: %w", err)
-	}
-	//noinspection GoUnhandledErrorResult
-	defer postResp.Body.Close()
-
-	if postResp.StatusCode != 200 {
-		var respBuf bytes.Buffer
-		_, _ = io.Copy(&respBuf, postResp.Body)
-		return fmt.Errorf("token request failed: (%d) %s", postResp.StatusCode, respBuf.String())
-	}
-
-	respDecoder := json.NewDecoder(postResp.Body)
-	var resp identityAuthResp
-	err = respDecoder.Decode(&resp)
-	if err != nil {
-		return fmt.Errorf("failed to decode token response: %w", err)
 	}
 
 	a.token = resp.Access.Token.Id
