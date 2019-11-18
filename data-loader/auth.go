@@ -19,6 +19,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"github.com/racker/go-restclient"
 	"go.uber.org/zap"
 	"net/http"
 	"time"
@@ -32,7 +33,7 @@ type IdentityAuthenticator struct {
 	apikey   string
 
 	log        *zap.SugaredLogger
-	restClient *RestClient
+	restClient *restclient.Client
 
 	token           string
 	tokenExpiration time.Time
@@ -46,7 +47,7 @@ func NewIdentityAuthenticator(log *zap.SugaredLogger, identityUrl string, userna
 		return nil, errors.New("password or Apikey is required")
 	}
 
-	restClient := NewRestClient()
+	restClient := restclient.New()
 	err := restClient.SetBaseUrl(identityUrl)
 	if err != nil {
 		return nil, fmt.Errorf("invalid Identity URL: %w", err)
@@ -90,7 +91,7 @@ type identityAuthResp struct {
 	}
 }
 
-func (a *IdentityAuthenticator) Intercept(req *http.Request, next RestClientNext) (*http.Response, error) {
+func (a *IdentityAuthenticator) Intercept(req *http.Request, next restclient.NextCallback) (*http.Response, error) {
 	if time.Now().After(a.tokenExpiration) {
 		if err := a.authenticate(); err != nil {
 			return nil, err
@@ -123,7 +124,7 @@ func (a *IdentityAuthenticator) authenticate() error {
 		"user", a.username,
 		"endpoint", a.restClient.BaseUrl)
 	err := a.restClient.Exchange("POST", "/v2.0/tokens", nil,
-		NewJsonEntity(req), NewJsonEntity(&resp))
+		restclient.NewJsonEntity(req), restclient.NewJsonEntity(&resp))
 	if err != nil {
 		return fmt.Errorf("failed to issue token request: %w", err)
 	}

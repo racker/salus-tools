@@ -19,6 +19,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/racker/go-restclient"
 	"github.com/yalp/jsonpath"
 	"go.uber.org/zap"
 	"net/url"
@@ -48,7 +49,7 @@ type PagedContent struct {
 
 type Loader struct {
 	log               *zap.SugaredLogger
-	restClient        *RestClient
+	restClient        *restclient.Client
 	sourceContentPath string
 	stats             struct {
 		SkippedExisting int
@@ -62,7 +63,7 @@ func NewLoader(log *zap.SugaredLogger, identityAuthenticator *IdentityAuthentica
 	ourLogger.Debugw("Setting up loader",
 		"adminUrl", adminUrl)
 
-	restClient := NewRestClient()
+	restClient := restclient.New()
 	err := restClient.SetBaseUrl(adminUrl)
 	if err != nil {
 		return nil, fmt.Errorf("invalid admin URL: %w", err)
@@ -138,7 +139,7 @@ func (l *Loader) retrieveExistingPagedContent(definition LoaderDefinition) ([]in
 
 		var pagedContent PagedContent
 		err := l.restClient.Exchange("GET", definition.ApiPath, query,
-			nil, NewJsonEntity(&pagedContent))
+			nil, restclient.NewJsonEntity(&pagedContent))
 
 		if err != nil {
 			return nil, fmt.Errorf("failed to get page %d of %s: %w", page, definition.Name, err)
@@ -272,7 +273,7 @@ func (l *Loader) processSourceContentFile(definition LoaderDefinition, existing 
 }
 
 func (l *Loader) loadEntity(definition LoaderDefinition, sourceContent interface{}) error {
-	err := l.restClient.Exchange("POST", definition.ApiPath, nil, NewJsonEntity(sourceContent), nil)
+	err := l.restClient.Exchange("POST", definition.ApiPath, nil, restclient.NewJsonEntity(sourceContent), nil)
 	if err != nil {
 		return fmt.Errorf("failed to create entity: %w", err)
 	}

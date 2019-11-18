@@ -9,7 +9,7 @@ The following command-line options are used to configure the authentication of t
 -  `--identity-password` 
 -  `--identity-apikey`
 
-**NOTE** when the admin URL is configured with a "localhost", authentication will be disabled and none of the configuration described above it required.
+**NOTE** when the admin URL is configured with a "localhost", authentication will be disabled and none of the configuration described above is required.
 
 ## Source content
 
