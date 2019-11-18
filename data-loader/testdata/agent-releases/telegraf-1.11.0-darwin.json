@@ -1,0 +1,10 @@
+{
+  "exe": "telegraf/1.11.0/bin/telegraf",
+  "labels": {
+    "agent_discovered_arch": "amd64",
+    "agent_discovered_os": "darwin"
+  },
+  "type": "TELEGRAF",
+  "url": "https://homebrew.bintray.com/bottles/telegraf-1.11.0.high_sierra.bottle.tar.gz",
+  "version": "1.11.0"
+}

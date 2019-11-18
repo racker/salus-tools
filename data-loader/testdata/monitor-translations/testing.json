@@ -1,0 +1,9 @@
+{
+  "agentType": "TELEGRAF",
+  "name": "testing-definition",
+  "translatorSpec": {
+    "type": "renameField",
+    "from": "just-a-test",
+    "to": "not-used"
+  }
+}
