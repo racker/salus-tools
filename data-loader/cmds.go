@@ -1,0 +1,121 @@
+/*
+ * Copyright 2019 Rackspace US, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package main
+
+import (
+	"context"
+	"flag"
+	"fmt"
+	"github.com/google/subcommands"
+	"github.com/itzg/go-flagsfiller"
+	"go.uber.org/zap"
+	"os"
+)
+
+type loadFromGitCmd struct {
+	GithubToken string `usage:"access [token] for private Github repos" env:"GITHUB_TOKEN"`
+	Sha         string `usage:"a specific commit SHA to check out"`
+}
+
+func (c *loadFromGitCmd) Name() string {
+	return "load-from-git"
+}
+
+func (c *loadFromGitCmd) Synopsis() string {
+	return "Loads content from a specific git repository"
+}
+
+func (c *loadFromGitCmd) Usage() string {
+	return `load-from-git [flags] repositoryUrl
+Flags:
+`
+}
+
+func (c *loadFromGitCmd) SetFlags(f *flag.FlagSet) {
+	filler := flagsfiller.New()
+	_ = filler.Fill(f, c)
+}
+
+func (c *loadFromGitCmd) Execute(ctx context.Context, f *flag.FlagSet, args ...interface{}) subcommands.ExitStatus {
+	log := args[0].(*zap.SugaredLogger)
+	config := args[1].(*Config)
+
+	if f.NArg() < 1 {
+		_, _ = fmt.Fprintln(os.Stderr, "missing repository URL")
+		f.Usage()
+		return subcommands.ExitUsageError
+	}
+
+	repoUrl := f.Arg(0)
+	log.Debugw("running load-from-git",
+		"repo", repoUrl, "sha", c.Sha, "config", config)
+
+	sourceContent := NewSourceContentFromGit(log, repoUrl, c.Sha, c.GithubToken)
+
+	err := setupAndLoad(config, log, sourceContent)
+	if err != nil {
+		log.Errorw("data loading failed", "err", err)
+		return subcommands.ExitFailure
+	}
+
+	return subcommands.ExitSuccess
+}
+
+type loadFromLocalDirCmd struct {
+}
+
+func (c *loadFromLocalDirCmd) Name() string {
+	return "load-from-local"
+}
+
+func (c *loadFromLocalDirCmd) Synopsis() string {
+	return "Loads content from a local directory"
+}
+
+func (c *loadFromLocalDirCmd) Usage() string {
+	return `load-from-local contentDirPath
+`
+}
+
+func (c *loadFromLocalDirCmd) SetFlags(*flag.FlagSet) {
+	// none to set
+}
+
+func (c *loadFromLocalDirCmd) Execute(ctx context.Context, f *flag.FlagSet, args ...interface{}) subcommands.ExitStatus {
+	log := args[0].(*zap.SugaredLogger)
+	config := args[1].(*Config)
+
+	if f.NArg() < 1 {
+		_, _ = fmt.Fprintln(os.Stderr, "missing content directory path")
+		f.Usage()
+		return subcommands.ExitUsageError
+	}
+
+	path := f.Arg(0)
+	log.Debugw("running load-from-local",
+		"path", path, "config", config)
+
+	sourceContent := NewSourceContentFromDir(log, path)
+
+	err := setupAndLoad(config, log, sourceContent)
+	if err != nil {
+		log.Errorw("data loading failed", "err", err)
+		return subcommands.ExitFailure
+	}
+
+	return subcommands.ExitSuccess
+}

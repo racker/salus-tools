@@ -58,6 +58,36 @@ type Loader struct {
 	}
 }
 
+func setupAndLoad(config *Config, log *zap.SugaredLogger, sourceContent SourceContent) error {
+	sourceContentPath, err := sourceContent.Prepare()
+	if err != nil {
+		return fmt.Errorf("unable to prepare source content: %w", err)
+	}
+	defer sourceContent.Cleanup()
+
+	var clientAuth *IdentityAuthenticator
+	if !strings.Contains(config.AdminUrl, "localhost") {
+		var err error
+		clientAuth, err = NewIdentityAuthenticator(log,
+			config.IdentityUrl, config.IdentityUsername, config.IdentityPassword, config.IdentityApikey)
+		if err != nil {
+			log.Fatalw("failed to setup Identity authenticator", "err", err)
+		}
+	}
+
+	loader, err := NewLoader(log, clientAuth, config.AdminUrl, sourceContentPath)
+	if err != nil {
+		return fmt.Errorf("failed to create loader: %w", err)
+	}
+
+	err = loader.LoadAll()
+	if err != nil {
+		return fmt.Errorf("failed to perform all loading: %w", err)
+	}
+
+	return nil
+}
+
 func NewLoader(log *zap.SugaredLogger, identityAuthenticator *IdentityAuthenticator, adminUrl string, sourceContentPath string) (*Loader, error) {
 	ourLogger := log.Named("loader")
 	ourLogger.Debugw("Setting up loader",
@@ -80,9 +110,9 @@ func NewLoader(log *zap.SugaredLogger, identityAuthenticator *IdentityAuthentica
 	}, nil
 }
 
-func (l *Loader) LoadAll(sourceContentPath string) error {
+func (l *Loader) LoadAll() error {
 	for _, definition := range loaderDefinitions {
-		err := l.load(definition, sourceContentPath)
+		err := l.load(definition, l.sourceContentPath)
 		if err != nil {
 			l.log.Warnw("failed to process loader definition",
 				"err", err,
@@ -222,9 +252,9 @@ func (l *Loader) processSourceContent(definition LoaderDefinition, sourceContent
 			if err != nil {
 				return fmt.Errorf("failed to process source content file %s: %w", path, err)
 			}
-		} else {
+		} else if !info.IsDir() {
 			l.log.Debugw("skipping non-JSON file", "path", path)
-		}
+		} // else ignore directories
 		return nil
 	})
 	if err != nil {
