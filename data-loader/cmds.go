@@ -23,6 +23,7 @@ import (
 	"github.com/google/subcommands"
 	"github.com/itzg/go-flagsfiller"
 	"go.uber.org/zap"
+	"log"
 	"os"
 )
 
@@ -47,11 +48,14 @@ Flags:
 
 func (c *loadFromGitCmd) SetFlags(f *flag.FlagSet) {
 	filler := flagsfiller.New()
-	_ = filler.Fill(f, c)
+	err := filler.Fill(f, c)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func (c *loadFromGitCmd) Execute(ctx context.Context, f *flag.FlagSet, args ...interface{}) subcommands.ExitStatus {
-	log := args[0].(*zap.SugaredLogger)
+	logger := args[0].(*zap.SugaredLogger)
 	config := args[1].(*Config)
 
 	if f.NArg() < 1 {
@@ -61,14 +65,14 @@ func (c *loadFromGitCmd) Execute(ctx context.Context, f *flag.FlagSet, args ...i
 	}
 
 	repoUrl := f.Arg(0)
-	log.Debugw("running load-from-git",
+	logger.Debugw("running load-from-git",
 		"repo", repoUrl, "sha", c.Sha, "config", config)
 
-	sourceContent := NewSourceContentFromGit(log, repoUrl, c.Sha, c.GithubToken)
+	sourceContent := NewSourceContentFromGit(logger, repoUrl, c.Sha, c.GithubToken)
 
-	err := setupAndLoad(config, log, sourceContent)
+	err := setupAndLoad(config, logger, sourceContent)
 	if err != nil {
-		log.Errorw("data loading failed", "err", err)
+		logger.Errorw("data loading failed", "err", err)
 		return subcommands.ExitFailure
 	}
 
@@ -96,7 +100,7 @@ func (c *loadFromLocalDirCmd) SetFlags(*flag.FlagSet) {
 }
 
 func (c *loadFromLocalDirCmd) Execute(ctx context.Context, f *flag.FlagSet, args ...interface{}) subcommands.ExitStatus {
-	log := args[0].(*zap.SugaredLogger)
+	logger := args[0].(*zap.SugaredLogger)
 	config := args[1].(*Config)
 
 	if f.NArg() < 1 {
@@ -106,14 +110,66 @@ func (c *loadFromLocalDirCmd) Execute(ctx context.Context, f *flag.FlagSet, args
 	}
 
 	path := f.Arg(0)
-	log.Debugw("running load-from-local",
+	logger.Debugw("running load-from-local",
 		"path", path, "config", config)
 
-	sourceContent := NewSourceContentFromDir(log, path)
+	sourceContent := NewSourceContentFromDir(logger, path)
 
-	err := setupAndLoad(config, log, sourceContent)
+	err := setupAndLoad(config, logger, sourceContent)
 	if err != nil {
-		log.Errorw("data loading failed", "err", err)
+		logger.Errorw("data loading failed", "err", err)
+		return subcommands.ExitFailure
+	}
+
+	return subcommands.ExitSuccess
+}
+
+type webhookServerCmd struct {
+	Port          int      `usage:"the port where webhook server will bind" default:"8080"`
+	GithubToken   string   `usage:"access [token] for private Github repos"`
+	WebhookSecret string   `usage:"secret key coordinated with webhook declaration in Github"`
+	MatchingRefs  []string `usage:"if given, limit to push events that regex-match"`
+}
+
+func (c *webhookServerCmd) Name() string {
+	return "webhook-server"
+}
+
+func (c *webhookServerCmd) Synopsis() string {
+	return "Run a web server to handle Github webhooks"
+}
+
+func (c *webhookServerCmd) Usage() string {
+	return `webhook-server [options]
+`
+}
+
+func (c *webhookServerCmd) SetFlags(f *flag.FlagSet) {
+	filler := flagsfiller.New(flagsfiller.WithEnv(""))
+	err := filler.Fill(f, c)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func (c *webhookServerCmd) Execute(ctx context.Context, f *flag.FlagSet, args ...interface{}) subcommands.ExitStatus {
+	logger := args[0].(*zap.SugaredLogger)
+	config := args[1].(*Config)
+
+	logger.Debugw("running webhook-server")
+
+	authenticator, err := OptionalIdentityAuthenticator(logger, config)
+	if err != nil {
+		logger.Errorw("failed to setup authenticator", "err", err)
+		return subcommands.ExitFailure
+	}
+	loader, err := NewLoader(logger, authenticator, config.AdminUrl)
+	webhookServer := NewWebhookServer(logger, loader, c.Port, c.GithubToken, c.WebhookSecret, c.MatchingRefs)
+
+	// blocks unless error at startup
+	err = webhookServer.Start()
+	if err != nil {
+		logger.Errorw("webhook server failed", "err", err)
 		return subcommands.ExitFailure
 	}
 

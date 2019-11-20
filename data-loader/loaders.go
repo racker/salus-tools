@@ -48,10 +48,9 @@ type PagedContent struct {
 }
 
 type Loader struct {
-	log               *zap.SugaredLogger
-	restClient        *restclient.Client
-	sourceContentPath string
-	stats             struct {
+	log        *zap.SugaredLogger
+	restClient *restclient.Client
+	stats      struct {
 		SkippedExisting int
 		Created         int
 		FailedToCreate  int
@@ -65,22 +64,17 @@ func setupAndLoad(config *Config, log *zap.SugaredLogger, sourceContent SourceCo
 	}
 	defer sourceContent.Cleanup()
 
-	var clientAuth *IdentityAuthenticator
-	if !strings.Contains(config.AdminUrl, "localhost") {
-		var err error
-		clientAuth, err = NewIdentityAuthenticator(log,
-			config.IdentityUrl, config.IdentityUsername, config.IdentityPassword, config.IdentityApikey)
-		if err != nil {
-			log.Fatalw("failed to setup Identity authenticator", "err", err)
-		}
+	clientAuth, err := OptionalIdentityAuthenticator(log, config)
+	if err != nil {
+		return fmt.Errorf("failed to setup Identity auth: %w", err)
 	}
 
-	loader, err := NewLoader(log, clientAuth, config.AdminUrl, sourceContentPath)
+	loader, err := NewLoader(log, clientAuth, config.AdminUrl)
 	if err != nil {
 		return fmt.Errorf("failed to create loader: %w", err)
 	}
 
-	err = loader.LoadAll()
+	err = loader.LoadAll(sourceContentPath)
 	if err != nil {
 		return fmt.Errorf("failed to perform all loading: %w", err)
 	}
@@ -88,7 +82,7 @@ func setupAndLoad(config *Config, log *zap.SugaredLogger, sourceContent SourceCo
 	return nil
 }
 
-func NewLoader(log *zap.SugaredLogger, identityAuthenticator *IdentityAuthenticator, adminUrl string, sourceContentPath string) (*Loader, error) {
+func NewLoader(log *zap.SugaredLogger, identityAuthenticator *IdentityAuthenticator, adminUrl string) (*Loader, error) {
 	ourLogger := log.Named("loader")
 	ourLogger.Debugw("Setting up loader",
 		"adminUrl", adminUrl)
@@ -104,15 +98,14 @@ func NewLoader(log *zap.SugaredLogger, identityAuthenticator *IdentityAuthentica
 	}
 
 	return &Loader{
-		log:               ourLogger,
-		restClient:        restClient,
-		sourceContentPath: sourceContentPath,
+		log:        ourLogger,
+		restClient: restClient,
 	}, nil
 }
 
-func (l *Loader) LoadAll() error {
+func (l *Loader) LoadAll(sourceContentPath string) error {
 	for _, definition := range loaderDefinitions {
-		err := l.load(definition, l.sourceContentPath)
+		err := l.load(definition, sourceContentPath)
 		if err != nil {
 			l.log.Warnw("failed to process loader definition",
 				"err", err,

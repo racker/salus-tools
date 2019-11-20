@@ -22,6 +22,7 @@ import (
 	"github.com/racker/go-restclient"
 	"go.uber.org/zap"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -133,4 +134,16 @@ func (a *IdentityAuthenticator) authenticate() error {
 	a.tokenExpiration = resp.Access.Token.Expires
 
 	return nil
+}
+
+func OptionalIdentityAuthenticator(log *zap.SugaredLogger, config *Config) (*IdentityAuthenticator, error) {
+	var clientAuth *IdentityAuthenticator
+	if !strings.Contains(config.AdminUrl, "localhost") {
+		var err error
+		clientAuth, err = NewIdentityAuthenticator(log,
+			config.IdentityUrl, config.IdentityUsername, config.IdentityPassword, config.IdentityApikey)
+		return nil, err
+	}
+
+	return clientAuth, nil
 }

@@ -3,6 +3,7 @@ module github.com/racker/salus-tools/data-loader
 go 1.13
 
 require (
+	github.com/google/go-github/v28 v28.1.1 // indirect
 	github.com/google/subcommands v1.0.1
 	github.com/iancoleman/strcase v0.0.0-20191112232945-16388991a334
 	github.com/itzg/go-flagsfiller v1.4.0

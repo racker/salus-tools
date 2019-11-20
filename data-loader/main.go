@@ -41,6 +41,7 @@ func main() {
 	subcommands.Register(subcommands.FlagsCommand(), "")
 	subcommands.Register(&loadFromGitCmd{}, "loading")
 	subcommands.Register(&loadFromLocalDirCmd{}, "loading")
+	subcommands.Register(&webhookServerCmd{}, "")
 
 	var config Config
 
