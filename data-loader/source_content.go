@@ -66,6 +66,10 @@ func NewSourceContentFromGit(log *zap.SugaredLogger, repository string, sha stri
 	}
 }
 
+// GitSourceContentBuilder abstracts the creation of gitSourceContent instances to allow for
+// mocking during unit tests
+type GitSourceContentBuilder func(repository string, sha string) SourceContent
+
 type gitSourceContent struct {
 	log         *zap.SugaredLogger
 	repository  string
@@ -117,7 +121,7 @@ func (c *gitSourceContent) Prepare() (string, error) {
 		c.sha = headRef.Hash().String()
 	}
 
-	c.log.Infow("cloned source content",
+	c.log.Debugw("cloned source content",
 		"repo", c.repository,
 		"sha", c.sha)
 

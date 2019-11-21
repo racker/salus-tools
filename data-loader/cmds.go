@@ -163,8 +163,14 @@ func (c *webhookServerCmd) Execute(ctx context.Context, f *flag.FlagSet, args ..
 		logger.Errorw("failed to setup authenticator", "err", err)
 		return subcommands.ExitFailure
 	}
+
 	loader, err := NewLoader(logger, authenticator, config.AdminUrl)
-	webhookServer := NewWebhookServer(logger, loader, c.Port, c.GithubToken, c.WebhookSecret, c.MatchingRefs)
+
+	gitContentBuilder := func(repository string, sha string) SourceContent {
+		return NewSourceContentFromGit(logger, repository, sha, c.GithubToken)
+	}
+
+	webhookServer := NewWebhookServer(logger, loader, c.Port, gitContentBuilder, c.WebhookSecret, c.MatchingRefs)
 
 	// blocks unless error at startup
 	err = webhookServer.Start()

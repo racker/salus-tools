@@ -21,33 +21,38 @@ import (
 	"github.com/google/go-github/v28/github"
 	"go.uber.org/zap"
 	"net/http"
+	"reflect"
 	"regexp"
 )
 
 type WebhookServer struct {
-	log           *zap.SugaredLogger
-	loader        *Loader
-	port          int
-	githubToken   string
-	webhookSecret []byte
-	matchingRefs  []string
+	log               *zap.SugaredLogger
+	loader            Loader
+	port              int
+	gitContentBuilder GitSourceContentBuilder
+	webhookSecret     []byte
+	matchingRefs      []string
 }
 
-func NewWebhookServer(log *zap.SugaredLogger, loader *Loader, port int, githubToken string,
-	webhookSecret string, matchingRefs []string) *WebhookServer {
+func NewWebhookServer(log *zap.SugaredLogger, loader Loader, port int, gitContentBuilder GitSourceContentBuilder, webhookSecret string, matchingRefs []string) *WebhookServer {
 	ourLogger := log.Named("webhook")
 	return &WebhookServer{
-		log:           ourLogger,
-		loader:        loader,
-		port:          port,
-		githubToken:   githubToken,
-		webhookSecret: []byte(webhookSecret),
-		matchingRefs:  matchingRefs,
+		log:               ourLogger,
+		loader:            loader,
+		port:              port,
+		gitContentBuilder: gitContentBuilder,
+		webhookSecret:     []byte(webhookSecret),
+		matchingRefs:      matchingRefs,
 	}
 }
 
 func (s *WebhookServer) Start() error {
 	http.HandleFunc("/webhook", s.handleWebhook)
+
+	// register healthcheck endpoint
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
 
 	s.log.Infow("webhook server running", "port", s.port)
 	return http.ListenAndServe(fmt.Sprintf(":%d", s.port), nil)
@@ -87,7 +92,8 @@ func (s *WebhookServer) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		}
 
 	default:
-		s.log.Debugw("ignoring unsupported webhook event type")
+		s.log.Debugw("ignoring unsupported webhook event type",
+			"type", reflect.ValueOf(event).Type())
 	}
 }
 
@@ -112,7 +118,7 @@ func (s *WebhookServer) handlePushEvent(deliveryId string, event *github.PushEve
 		return nil
 	}
 
-	sourceContent := NewSourceContentFromGit(s.log, cloneURL, commitId, s.githubToken)
+	sourceContent := s.gitContentBuilder(cloneURL, commitId)
 
 	sourceContentPath, err := sourceContent.Prepare()
 	if err != nil {
@@ -121,7 +127,8 @@ func (s *WebhookServer) handlePushEvent(deliveryId string, event *github.PushEve
 	defer sourceContent.Cleanup()
 
 	s.log.Infow("loading source content for webhook push event",
-		"pusher", pusher, "ref", ref, "cloneURL", cloneURL, "deliveryId", deliveryId)
+		"pusher", pusher, "ref", ref, "cloneURL", cloneURL, "commitId", commitId,
+		"deliveryId", deliveryId)
 	err = s.loader.LoadAll(sourceContentPath)
 	if err != nil {
 		return fmt.Errorf("failed load content: %w", err)

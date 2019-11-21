@@ -47,7 +47,11 @@ type PagedContent struct {
 	Last    bool
 }
 
-type Loader struct {
+type Loader interface {
+	LoadAll(sourceContentPath string) error
+}
+
+type LoaderImpl struct {
 	log        *zap.SugaredLogger
 	restClient *restclient.Client
 	stats      struct {
@@ -82,7 +86,7 @@ func setupAndLoad(config *Config, log *zap.SugaredLogger, sourceContent SourceCo
 	return nil
 }
 
-func NewLoader(log *zap.SugaredLogger, identityAuthenticator *IdentityAuthenticator, adminUrl string) (*Loader, error) {
+func NewLoader(log *zap.SugaredLogger, identityAuthenticator *IdentityAuthenticator, adminUrl string) (Loader, error) {
 	ourLogger := log.Named("loader")
 	ourLogger.Debugw("Setting up loader",
 		"adminUrl", adminUrl)
@@ -97,13 +101,13 @@ func NewLoader(log *zap.SugaredLogger, identityAuthenticator *IdentityAuthentica
 		restClient.AddInterceptor(identityAuthenticator.Intercept)
 	}
 
-	return &Loader{
+	return &LoaderImpl{
 		log:        ourLogger,
 		restClient: restClient,
 	}, nil
 }
 
-func (l *Loader) LoadAll(sourceContentPath string) error {
+func (l *LoaderImpl) LoadAll(sourceContentPath string) error {
 	for _, definition := range loaderDefinitions {
 		err := l.load(definition, sourceContentPath)
 		if err != nil {
@@ -119,7 +123,7 @@ func (l *Loader) LoadAll(sourceContentPath string) error {
 	return nil
 }
 
-func (l *Loader) load(definition LoaderDefinition, sourceContentPath string) error {
+func (l *LoaderImpl) load(definition LoaderDefinition, sourceContentPath string) error {
 
 	var content []interface{}
 	var err error
@@ -150,7 +154,7 @@ func (l *Loader) load(definition LoaderDefinition, sourceContentPath string) err
 	return nil
 }
 
-func (l *Loader) retrieveExistingPagedContent(definition LoaderDefinition) ([]interface{}, error) {
+func (l *LoaderImpl) retrieveExistingPagedContent(definition LoaderDefinition) ([]interface{}, error) {
 	l.log.Debugw("loading all pages for definition",
 		"definition", definition)
 
@@ -207,7 +211,7 @@ func (UniquenessTracker) formKey(fieldValues []interface{}) string {
 	return key
 }
 
-func (l *Loader) identifyExistingContent(definition LoaderDefinition, allContent []interface{}) (UniquenessTracker, error) {
+func (l *LoaderImpl) identifyExistingContent(definition LoaderDefinition, allContent []interface{}) (UniquenessTracker, error) {
 	tracker := make(UniquenessTracker)
 
 	for _, v := range allContent {
@@ -222,7 +226,7 @@ func (l *Loader) identifyExistingContent(definition LoaderDefinition, allContent
 	return tracker, nil
 }
 
-func (l *Loader) extractFieldValues(definition LoaderDefinition, content interface{}) ([]interface{}, error) {
+func (l *LoaderImpl) extractFieldValues(definition LoaderDefinition, content interface{}) ([]interface{}, error) {
 	fieldValues := make([]interface{}, 0, len(definition.UniqueFieldPaths))
 	for _, path := range definition.UniqueFieldPaths {
 		fieldValue, err := jsonpath.Read(content, path)
@@ -234,7 +238,7 @@ func (l *Loader) extractFieldValues(definition LoaderDefinition, content interfa
 	return fieldValues, nil
 }
 
-func (l *Loader) processSourceContent(definition LoaderDefinition, sourceContentPath string, existing UniquenessTracker) error {
+func (l *LoaderImpl) processSourceContent(definition LoaderDefinition, sourceContentPath string, existing UniquenessTracker) error {
 
 	err := filepath.Walk(filepath.Join(sourceContentPath, definition.Name), func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -257,7 +261,7 @@ func (l *Loader) processSourceContent(definition LoaderDefinition, sourceContent
 	return nil
 }
 
-func (l *Loader) processSourceContentFile(definition LoaderDefinition, existing UniquenessTracker, path string) error {
+func (l *LoaderImpl) processSourceContentFile(definition LoaderDefinition, existing UniquenessTracker, path string) error {
 	file, err := os.Open(path)
 	if err != nil {
 		return fmt.Errorf("failed to open source content file: %w", err)
@@ -295,7 +299,7 @@ func (l *Loader) processSourceContentFile(definition LoaderDefinition, existing 
 	return nil
 }
 
-func (l *Loader) loadEntity(definition LoaderDefinition, sourceContent interface{}) error {
+func (l *LoaderImpl) loadEntity(definition LoaderDefinition, sourceContent interface{}) error {
 	err := l.restClient.Exchange("POST", definition.ApiPath, nil, restclient.NewJsonEntity(sourceContent), nil)
 	if err != nil {
 		return fmt.Errorf("failed to create entity: %w", err)
