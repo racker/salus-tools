@@ -46,6 +46,7 @@ tls:
     token_provider: keystone_v2
   token_providers:
     keystone_v2:
+      identityServiceUrl: "{{.IdentityUrl}}"
       username: "{{.RegularId}}"
       apikey: "{{.ApiKey}}"
 ambassador:

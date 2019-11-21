@@ -47,6 +47,7 @@ type TemplateFields = struct {
 	RegularId         string
 	AuthUrl           string
 	AmbassadorAddress string
+	IdentityUrl       string
 }
 type config = struct {
 	mode              string
