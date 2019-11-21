@@ -149,7 +149,8 @@ func initEnvoy(c config, releaseId string) (cmd *exec.Cmd) {
 	checkErr(err, "parsing envoy template")
 
 	err = tmpl.Execute(f, TemplateFields{c.resourceId, c.privateZoneId,
-		c.certDir, c.regularApiKey, c.regularId, c.authUrl, c.ambassadorAddress})
+		c.certDir, c.regularApiKey, c.regularId, c.authUrl, c.ambassadorAddress,
+	c.identityUrl})
 	checkErr(err, "creating envoy template")
 	err = f.Close()
 	checkErr(err, "closing envoy config file: "+configFileName)

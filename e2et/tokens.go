@@ -43,7 +43,7 @@ func getToken(c config, user string, apiKey string, pw string) string {
 	if user == "" {
 		return ""
 	}
-	url := c.identityUrl
+	url := c.identityUrl + "tokens"
 	var tokenData string
 	if pw != "" {
 		tokenData = fmt.Sprintf(pwTokenData, user, pw)
