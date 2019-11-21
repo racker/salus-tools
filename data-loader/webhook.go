@@ -95,6 +95,8 @@ func (s *WebhookServer) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		s.log.Debugw("ignoring unsupported webhook event type",
 			"type", reflect.ValueOf(event).Type())
 	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 func (s *WebhookServer) writeErrResponse(statusCode int, w http.ResponseWriter, err error) {
