@@ -5,7 +5,6 @@ go 1.13
 require (
 	github.com/google/go-github/v28 v28.1.1
 	github.com/google/subcommands v1.0.1
-	github.com/iancoleman/strcase v0.0.0-20191112232945-16388991a334
 	github.com/itzg/go-flagsfiller v1.4.0
 	github.com/racker/go-restclient v1.1.0
 	github.com/stretchr/testify v1.4.0
