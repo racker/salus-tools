@@ -159,11 +159,3 @@ func (s *WebhookServer) isApplicableRef(ref string) bool {
 
 	return false
 }
-
-func nillableString(s *string, field string) (string, error) {
-	if s == nil {
-		return "", fmt.Errorf("%s is not set", field)
-	} else {
-		return *s, nil
-	}
-}
