@@ -62,9 +62,12 @@ func (b *MockGitContentBuilder) build(repository string, sha string) SourceConte
 	return b.sourceContent
 }
 
-func TestWebhookServer_handleWebhook_Ping(t *testing.T) {
+func TestWebhookServer_handleWebhook_IgnoreNonPush(t *testing.T) {
 	server, loader, sourceContent, _ := createTestWebhookServer("", []string{}, false)
 
+	// A ping event is used here since github sends a ping event when a webhook is created in the UI,
+	// so it's an obvious one that must be ignored
+	// https://developer.github.com/webhooks/#ping-event
 	reqBody, err := os.Open("testdata/webhook_ping_req.json")
 	require.NoError(t, err)
 	defer reqBody.Close()
@@ -81,9 +84,10 @@ func TestWebhookServer_handleWebhook_Ping(t *testing.T) {
 	sourceContent.AssertExpectations(t)
 }
 
-func TestWebhookServer_handleWebhook_PingAuth(t *testing.T) {
+func TestWebhookServer_handleWebhook_Auth(t *testing.T) {
 	server, loader, sourceContent, _ := createTestWebhookServer("notsosecret", []string{}, false)
 
+	// using a ping again since it keeps the setup and assert code simple below
 	reqBody, err := os.Open("testdata/webhook_ping_req.json")
 	require.NoError(t, err)
 	defer reqBody.Close()
@@ -102,9 +106,10 @@ func TestWebhookServer_handleWebhook_PingAuth(t *testing.T) {
 	sourceContent.AssertExpectations(t)
 }
 
-func TestWebhookServer_handleWebhook_PingFailedAuth(t *testing.T) {
+func TestWebhookServer_handleWebhook_FailedAuth(t *testing.T) {
 	server, loader, sourceContent, _ := createTestWebhookServer("WRONG SECRET", []string{}, false)
 
+	// using a ping again since it keeps the setup and assert code simple below
 	reqBody, err := os.Open("testdata/webhook_ping_req.json")
 	require.NoError(t, err)
 	defer reqBody.Close()
@@ -143,6 +148,7 @@ func TestWebhookServer_handleWebhook_PushRequest(t *testing.T) {
 		"https://github.com/Rackspace-Segment-Support/test-salus-data-loader-content.git",
 		"e4168647ae258ed748a8c765127c0f3595e34bf0")
 	sourceContent.AssertCalled(t, "Prepare")
+	sourceContent.AssertCalled(t, "Cleanup")
 }
 
 func TestWebhookServer_handleWebhook_MatchesRefExact(t *testing.T) {
@@ -168,6 +174,7 @@ func TestWebhookServer_handleWebhook_MatchesRefExact(t *testing.T) {
 		"https://github.com/Rackspace-Segment-Support/test-salus-data-loader-content.git",
 		"e4168647ae258ed748a8c765127c0f3595e34bf0")
 	sourceContent.AssertCalled(t, "Prepare")
+	sourceContent.AssertCalled(t, "Cleanup")
 }
 
 func TestWebhookServer_handleWebhook_MatchesRefMulti(t *testing.T) {
@@ -193,6 +200,7 @@ func TestWebhookServer_handleWebhook_MatchesRefMulti(t *testing.T) {
 		"https://github.com/Rackspace-Segment-Support/test-salus-data-loader-content.git",
 		"e4168647ae258ed748a8c765127c0f3595e34bf0")
 	sourceContent.AssertCalled(t, "Prepare")
+	sourceContent.AssertCalled(t, "Cleanup")
 }
 
 func TestWebhookServer_handleWebhook_MatchesRefRegex(t *testing.T) {
@@ -217,6 +225,7 @@ func TestWebhookServer_handleWebhook_MatchesRefRegex(t *testing.T) {
 		"https://github.com/Rackspace-Segment-Support/test-salus-data-loader-content.git",
 		"1cc985fd10b43a614fafd343190e7ee871732e25")
 	sourceContent.AssertCalled(t, "Prepare")
+	sourceContent.AssertCalled(t, "Cleanup")
 }
 
 func TestWebhookServer_handleWebhook_MisMatchRef(t *testing.T) {
