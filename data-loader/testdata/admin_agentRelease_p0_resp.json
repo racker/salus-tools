@@ -1,0 +1,22 @@
+{
+  "content": [
+    {
+      "id": "7aa08ad3-5f65-4f69-8b02-111011101110",
+      "type": "TELEGRAF",
+      "version": "1.11.0",
+      "labels": {
+        "agent_discovered_arch": "amd64",
+        "agent_discovered_os": "linux"
+      },
+      "url": "https://dl.influxdata.com/telegraf/releases/telegraf-1.11.0-static_linux_amd64.tar.gz",
+      "exe": "./telegraf/telegraf",
+      "createdTimestamp": "2019-09-12T15:17:11Z",
+      "updatedTimestamp": "2019-09-12T15:17:11Z"
+    }
+  ],
+  "number": 0,
+  "totalPages": 2,
+  "totalElements": 2,
+  "last": false,
+  "first": true
+}

@@ -1,0 +1,139 @@
+{
+  "ref": "refs/heads/master",
+  "before": "c50c623b20405c885cd81f571209ffc76d3078d7",
+  "after": "e4168647ae258ed748a8c765127c0f3595e34bf0",
+  "repository": {
+    "id": 223017076,
+    "node_id": "MDEwOlJlcG9zaXRvcnkyMjMwMTcwNzY=",
+    "name": "test-salus-data-loader-content",
+    "full_name": "Rackspace-Segment-Support/test-salus-data-loader-content",
+    "private": false,
+    "owner": {
+      "name": "Rackspace-Segment-Support",
+      "email": null,
+      "login": "Rackspace-Segment-Support",
+      "id": 46577078,
+      "node_id": "MDEyOk9yZ2FuaXphdGlvbjQ2NTc3MDc4",
+      "avatar_url": "https://avatars1.githubusercontent.com/u/46577078?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/Rackspace-Segment-Support",
+      "type": "Organization",
+      "site_admin": false
+    },
+    "html_url": "https://github.com/Rackspace-Segment-Support/test-salus-data-loader-content",
+    "description": "Used for testing Salus data-loader's git processing",
+    "fork": false,
+    "url": "https://github.com/Rackspace-Segment-Support/test-salus-data-loader-content",
+    "created_at": 1574280029,
+    "updated_at": "2019-11-21T14:29:58Z",
+    "pushed_at": 1574347340,
+    "git_url": "git://github.com/Rackspace-Segment-Support/test-salus-data-loader-content.git",
+    "ssh_url": "git@github.com:Rackspace-Segment-Support/test-salus-data-loader-content.git",
+    "clone_url": "https://github.com/Rackspace-Segment-Support/test-salus-data-loader-content.git",
+    "svn_url": "https://github.com/Rackspace-Segment-Support/test-salus-data-loader-content",
+    "homepage": null,
+    "size": 0,
+    "stargazers_count": 0,
+    "watchers_count": 0,
+    "language": null,
+    "has_issues": true,
+    "has_projects": true,
+    "has_downloads": true,
+    "has_wiki": true,
+    "has_pages": false,
+    "forks_count": 0,
+    "mirror_url": null,
+    "archived": false,
+    "disabled": false,
+    "open_issues_count": 0,
+    "license": null,
+    "forks": 0,
+    "open_issues": 0,
+    "watchers": 0,
+    "default_branch": "master",
+    "stargazers": 0,
+    "master_branch": "master",
+    "organization": "Rackspace-Segment-Support"
+  },
+  "pusher": {
+    "name": "itzg",
+    "email": "itzgeoff@gmail.com"
+  },
+  "organization": {
+    "login": "Rackspace-Segment-Support",
+    "id": 46577078,
+    "node_id": "MDEyOk9yZ2FuaXphdGlvbjQ2NTc3MDc4",
+    "description": "Rackspace Support Systems"
+  },
+  "sender": {
+    "login": "itzg",
+    "id": 988985,
+    "node_id": "MDQ6VXNlcjk4ODk4NQ==",
+    "avatar_url": "https://avatars2.githubusercontent.com/u/988985?v=4",
+    "gravatar_id": "",
+    "url": "https://api.github.com/users/itzg",
+    "type": "User",
+    "site_admin": false
+  },
+  "created": false,
+  "deleted": false,
+  "forced": false,
+  "base_ref": null,
+  "compare": "https://github.com/Rackspace-Segment-Support/test-salus-data-loader-content/compare/c50c623b2040...e4168647ae25",
+  "commits": [
+    {
+      "id": "e4168647ae258ed748a8c765127c0f3595e34bf0",
+      "tree_id": "e5cca5fbc35883d293a6a6e3e450c9dc94174058",
+      "distinct": true,
+      "message": "update 4",
+      "timestamp": "2019-11-21T08:42:15-06:00",
+      "url": "https://github.com/Rackspace-Segment-Support/test-salus-data-loader-content/commit/e4168647ae258ed748a8c765127c0f3595e34bf0",
+      "author": {
+        "name": "Geoff Bourne",
+        "email": "geoff.bourne@rackspace.com",
+        "username": "itzg"
+      },
+      "committer": {
+        "name": "Geoff Bourne",
+        "email": "geoff.bourne@rackspace.com",
+        "username": "itzg"
+      },
+      "added": [
+
+      ],
+      "removed": [
+
+      ],
+      "modified": [
+        "testing.txt"
+      ]
+    }
+  ],
+  "head_commit": {
+    "id": "e4168647ae258ed748a8c765127c0f3595e34bf0",
+    "tree_id": "e5cca5fbc35883d293a6a6e3e450c9dc94174058",
+    "distinct": true,
+    "message": "update 4",
+    "timestamp": "2019-11-21T08:42:15-06:00",
+    "url": "https://github.com/Rackspace-Segment-Support/test-salus-data-loader-content/commit/e4168647ae258ed748a8c765127c0f3595e34bf0",
+    "author": {
+      "name": "Geoff Bourne",
+      "email": "geoff.bourne@rackspace.com",
+      "username": "itzg"
+    },
+    "committer": {
+      "name": "Geoff Bourne",
+      "email": "geoff.bourne@rackspace.com",
+      "username": "itzg"
+    },
+    "added": [
+
+    ],
+    "removed": [
+
+    ],
+    "modified": [
+      "testing.txt"
+    ]
+  }
+}

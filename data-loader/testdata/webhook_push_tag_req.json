@@ -1,0 +1,116 @@
+{
+  "ref": "refs/tags/v1.0",
+  "before": "0000000000000000000000000000000000000000",
+  "after": "1cc985fd10b43a614fafd343190e7ee871732e25",
+  "repository": {
+    "id": 223017076,
+    "node_id": "MDEwOlJlcG9zaXRvcnkyMjMwMTcwNzY=",
+    "name": "test-salus-data-loader-content",
+    "full_name": "Rackspace-Segment-Support/test-salus-data-loader-content",
+    "private": false,
+    "owner": {
+      "name": "Rackspace-Segment-Support",
+      "email": null,
+      "login": "Rackspace-Segment-Support",
+      "id": 46577078,
+      "node_id": "MDEyOk9yZ2FuaXphdGlvbjQ2NTc3MDc4",
+      "avatar_url": "https://avatars1.githubusercontent.com/u/46577078?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/Rackspace-Segment-Support",
+      "type": "Organization",
+      "site_admin": false
+    },
+    "html_url": "https://github.com/Rackspace-Segment-Support/test-salus-data-loader-content",
+    "description": "Used for testing Salus data-loader's git processing",
+    "fork": false,
+    "url": "https://github.com/Rackspace-Segment-Support/test-salus-data-loader-content",
+    "created_at": 1574280029,
+    "updated_at": "2019-11-20T20:05:56Z",
+    "pushed_at": 1574283051,
+    "git_url": "git://github.com/Rackspace-Segment-Support/test-salus-data-loader-content.git",
+    "ssh_url": "git@github.com:Rackspace-Segment-Support/test-salus-data-loader-content.git",
+    "clone_url": "https://github.com/Rackspace-Segment-Support/test-salus-data-loader-content.git",
+    "svn_url": "https://github.com/Rackspace-Segment-Support/test-salus-data-loader-content",
+    "homepage": null,
+    "size": 0,
+    "stargazers_count": 0,
+    "watchers_count": 0,
+    "language": null,
+    "has_issues": true,
+    "has_projects": true,
+    "has_downloads": true,
+    "has_wiki": true,
+    "has_pages": false,
+    "forks_count": 0,
+    "mirror_url": null,
+    "archived": false,
+    "disabled": false,
+    "open_issues_count": 0,
+    "license": null,
+    "forks": 0,
+    "open_issues": 0,
+    "watchers": 0,
+    "default_branch": "master",
+    "stargazers": 0,
+    "master_branch": "master",
+    "organization": "Rackspace-Segment-Support"
+  },
+  "pusher": {
+    "name": "itzg",
+    "email": "itzgeoff@gmail.com"
+  },
+  "organization": {
+    "login": "Rackspace-Segment-Support",
+    "id": 46577078,
+    "node_id": "MDEyOk9yZ2FuaXphdGlvbjQ2NTc3MDc4",
+    "url": "https://api.github.com/orgs/Rackspace-Segment-Support",
+    "description": "Rackspace Support Systems"
+  },
+  "sender": {
+    "login": "itzg",
+    "id": 988985,
+    "node_id": "MDQ6VXNlcjk4ODk4NQ==",
+    "avatar_url": "https://avatars2.githubusercontent.com/u/988985?v=4",
+    "gravatar_id": "",
+    "url": "https://api.github.com/users/itzg",
+    "type": "User",
+    "site_admin": false
+  },
+  "created": true,
+  "deleted": false,
+  "forced": false,
+  "base_ref": "refs/heads/master",
+  "compare": "https://github.com/Rackspace-Segment-Support/test-salus-data-loader-content/compare/v1",
+  "commits": [
+
+  ],
+  "head_commit": {
+    "id": "1cc985fd10b43a614fafd343190e7ee871732e25",
+    "tree_id": "fb1354a99d586d59c6d4cafdbc97f70241000eb1",
+    "distinct": true,
+    "message": "Initial commit",
+    "timestamp": "2019-11-20T14:05:49-06:00",
+    "url": "https://github.com/Rackspace-Segment-Support/test-salus-data-loader-content/commit/1cc985fd10b43a614fafd343190e7ee871732e25",
+    "author": {
+      "name": "Geoff Bourne",
+      "email": "geoff.bourne@rackspace.com",
+      "username": "itzg"
+    },
+    "committer": {
+      "name": "Geoff Bourne",
+      "email": "geoff.bourne@rackspace.com",
+      "username": "itzg"
+    },
+    "added": [
+      ".gitignore",
+      "agent-releases/.gitkeep",
+      "monitor-translations/.gitkeep"
+    ],
+    "removed": [
+
+    ],
+    "modified": [
+
+    ]
+  }
+}

@@ -22,6 +22,7 @@ import (
 	"github.com/racker/go-restclient"
 	"go.uber.org/zap"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -133,4 +134,16 @@ func (a *IdentityAuthenticator) authenticate() error {
 	a.tokenExpiration = resp.Access.Token.Expires
 
 	return nil
+}
+
+// OptionalIdentityAuthenticator creates an IdentityAuthenticator instance only if the configured
+// admin URL is remote.
+func OptionalIdentityAuthenticator(log *zap.SugaredLogger, config *Config) (*IdentityAuthenticator, error) {
+	if !strings.Contains(config.AdminUrl, "localhost") {
+		clientAuth, err := NewIdentityAuthenticator(log,
+			config.IdentityUrl, config.IdentityUsername, config.IdentityPassword, config.IdentityApikey)
+		return clientAuth, err
+	}
+
+	return nil, nil
 }

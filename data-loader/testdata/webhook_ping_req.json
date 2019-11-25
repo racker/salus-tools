@@ -1,0 +1,86 @@
+{
+  "zen": "Speak like a human.",
+  "hook_id": 159750078,
+  "hook": {
+    "type": "Repository",
+    "id": 159750078,
+    "name": "web",
+    "active": true,
+    "events": [
+      "push"
+    ],
+    "config": {
+      "content_type": "json",
+      "insecure_ssl": "0",
+      "secret": "********",
+      "url": "https://data-loader-ixfsstr5na-uc.a.run.app/webhook"
+    },
+    "updated_at": "2019-11-21T14:39:44Z",
+    "created_at": "2019-11-21T14:39:44Z",
+    "url": "https://api.github.com/repos/Rackspace-Segment-Support/test-salus-data-loader-content/hooks/159750078",
+    "test_url": "https://api.github.com/repos/Rackspace-Segment-Support/test-salus-data-loader-content/hooks/159750078/test",
+    "ping_url": "https://api.github.com/repos/Rackspace-Segment-Support/test-salus-data-loader-content/hooks/159750078/pings",
+    "last_response": {
+      "code": null,
+      "status": "unused",
+      "message": null
+    }
+  },
+  "repository": {
+    "id": 223017076,
+    "node_id": "MDEwOlJlcG9zaXRvcnkyMjMwMTcwNzY=",
+    "name": "test-salus-data-loader-content",
+    "full_name": "Rackspace-Segment-Support/test-salus-data-loader-content",
+    "private": false,
+    "owner": {
+      "login": "Rackspace-Segment-Support",
+      "id": 46577078,
+      "node_id": "MDEyOk9yZ2FuaXphdGlvbjQ2NTc3MDc4",
+      "avatar_url": "https://avatars1.githubusercontent.com/u/46577078?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/Rackspace-Segment-Support",
+      "type": "Organization",
+      "site_admin": false
+    },
+    "html_url": "https://github.com/Rackspace-Segment-Support/test-salus-data-loader-content",
+    "description": "Used for testing Salus data-loader's git processing",
+    "fork": false,
+    "created_at": "2019-11-20T20:00:29Z",
+    "updated_at": "2019-11-21T14:29:58Z",
+    "pushed_at": "2019-11-21T14:31:23Z",
+    "git_url": "git://github.com/Rackspace-Segment-Support/test-salus-data-loader-content.git",
+    "ssh_url": "git@github.com:Rackspace-Segment-Support/test-salus-data-loader-content.git",
+    "clone_url": "https://github.com/Rackspace-Segment-Support/test-salus-data-loader-content.git",
+    "svn_url": "https://github.com/Rackspace-Segment-Support/test-salus-data-loader-content",
+    "homepage": null,
+    "size": 0,
+    "stargazers_count": 0,
+    "watchers_count": 0,
+    "language": null,
+    "has_issues": true,
+    "has_projects": true,
+    "has_downloads": true,
+    "has_wiki": true,
+    "has_pages": false,
+    "forks_count": 0,
+    "mirror_url": null,
+    "archived": false,
+    "disabled": false,
+    "open_issues_count": 0,
+    "license": null,
+    "forks": 0,
+    "open_issues": 0,
+    "watchers": 0,
+    "default_branch": "master"
+  },
+  "sender": {
+    "login": "itzg",
+    "id": 988985,
+    "node_id": "MDQ6VXNlcjk4ODk4NQ==",
+    "avatar_url": "https://avatars2.githubusercontent.com/u/988985?v=4",
+    "gravatar_id": "",
+    "url": "https://api.github.com/users/itzg",
+    "type": "User",
+    "site_admin": false
+  }
+}
