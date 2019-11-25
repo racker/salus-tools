@@ -136,14 +136,14 @@ func (a *IdentityAuthenticator) authenticate() error {
 	return nil
 }
 
+// OptionalIdentityAuthenticator creates an IdentityAuthenticator instance only if the configured
+// admin URL is remote.
 func OptionalIdentityAuthenticator(log *zap.SugaredLogger, config *Config) (*IdentityAuthenticator, error) {
-	var clientAuth *IdentityAuthenticator
 	if !strings.Contains(config.AdminUrl, "localhost") {
-		var err error
-		clientAuth, err = NewIdentityAuthenticator(log,
+		clientAuth, err := NewIdentityAuthenticator(log,
 			config.IdentityUrl, config.IdentityUsername, config.IdentityPassword, config.IdentityApikey)
-		return nil, err
+		return clientAuth, err
 	}
 
-	return clientAuth, nil
+	return nil, nil
 }
