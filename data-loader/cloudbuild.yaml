@@ -8,7 +8,7 @@ steps:
       - ./...
   # using Docker build caching https://cloud.google.com/cloud-build/docs/kaniko-cache
   - name: 'gcr.io/kaniko-project/executor:latest'
-    dir: data-loader
     args:
+      - --context=/workspace/data-loader
       - --destination=gcr.io/$PROJECT_ID/data-loader
       - --cache=true
