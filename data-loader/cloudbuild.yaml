@@ -1,12 +1,14 @@
 steps:
   - name: 'mirror.gcr.io/library/golang'
     env: ['GO111MODULE=on']
+    dir: data-loader
     args:
       - go
       - test
       - ./...
   # using Docker build caching https://cloud.google.com/cloud-build/docs/kaniko-cache
   - name: 'gcr.io/kaniko-project/executor:latest'
+    dir: data-loader
     args:
       - --destination=gcr.io/$PROJECT_ID/data-loader
       - --cache=true
