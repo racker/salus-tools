@@ -41,6 +41,8 @@ import (
 	"runtime"
 	"strings"
 	"time"
+        "github.com/shirou/gopsutil/process"
+
 )
 
 func initConfig() config {
@@ -72,7 +74,7 @@ func initConfig() config {
 	dir, err := ioutil.TempDir("", "e2et")
 	checkErr(err, "error creating temp dir")
 	c.dir = dir
-	fmt.Println("Temp dir is : " + c.dir)
+	log.Info("Temp dir is : " + c.dir)
 	c.kafkaBrokers = strings.Split(viper.GetString("kafka.brokers"), ",")
 	c.eventTopic = viper.GetString("event.topic")
 	c.identityUrl = viper.GetString("identity.url")
@@ -105,7 +107,7 @@ func main() {
 
 	if *portString != "" {
 		w := webServer{portString, cfgFileName}
-		fmt.Println("gbjstarting web server")
+		log.Info("starting web server")
 		go w.start()
 	} else {
 		runTest()
@@ -116,6 +118,16 @@ func main() {
 func runTest() {
 	log.Println("Starting e2et")
 	c := initConfig()
+	processes, err := process.Processes()
+	checkErr(err, "getting processes")
+	for _, p := range processes {
+		name, _ := p.Name()
+		if strings.Contains(name, "telemetry-envoy") {
+			c, _ := p.Cmdline()
+			log.Info("killing envoy: " + c)
+			p.Kill()
+		}
+	}
 
 	releaseId := getReleases(c)
 	deleteAgentInstalls(c)
@@ -138,6 +150,7 @@ func runTest() {
 	select {
 	case <-eventFound:
 		log.Println("events returned from kafka successfully")
+		os.Exit(0)
 	case <-time.After(5 * time.Minute):
 		log.Fatal("Timed out waiting for events")
 	}
@@ -530,7 +543,7 @@ type webServer struct {
 	cfgFileName *string
 }
 func (w *webServer)start() {
-	fmt.Println("starting web server: " + fmt.Sprintf(":%s", *w.portString))
+	log.Info("starting web server: " + fmt.Sprintf(":%s", *w.portString))
 	serverMux := http.NewServeMux()
 	serverMux.HandleFunc("/", w.handler)
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%s", *w.portString))
@@ -543,6 +556,7 @@ func (w *webServer)start() {
 }
 
 func (w *webServer) handler(wr http.ResponseWriter, r *http.Request) {
+	log.Info("starting request")
 	buf := new(bytes.Buffer)
 	cmd := exec.Command(os.Args[0], "--config=" + *w.cfgFileName)
 	cmd.Stdout = buf
@@ -555,5 +569,6 @@ func (w *webServer) handler(wr http.ResponseWriter, r *http.Request) {
 	} else {
 		_, _ = wr.Write([]byte(buf.String()))
 	}
+	log.Info("finished request")
 
 }
