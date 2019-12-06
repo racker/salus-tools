@@ -42,7 +42,7 @@ import (
 	"strings"
 	"time"
         "github.com/shirou/gopsutil/process"
-
+	"golang.org/x/sync/semaphore"
 )
 
 func initConfig() config {
@@ -106,7 +106,7 @@ func main() {
 	viper.ReadInConfig()
 
 	if *portString != "" {
-		w := webServer{portString, cfgFileName}
+		w := webServer{portString, cfgFileName, semaphore.NewWeighted(1)}
 		log.Info("starting web server")
 		go w.start()
 	} else {
@@ -122,7 +122,7 @@ func runTest() {
 	checkErr(err, "getting processes")
 	for _, p := range processes {
 		name, _ := p.Name()
-		if strings.Contains(name, "telemetry-envoy") {
+		if strings.Contains(name, "e2et-envoy") {
 			c, _ := p.Cmdline()
 			log.Info("killing envoy: " + c)
 			p.Kill()
@@ -194,7 +194,11 @@ func initEnvoy(c config, releaseId string) (cmd *exec.Cmd) {
 	cmd = exec.Command("tar", "-xf", c.dir+"/envoy.tar.gz", "-C", c.dir)
 	err = cmd.Run();
 	checkErr(err, "decompressing tarball")
-	cmd = exec.Command(c.dir+"/telemetry-envoy", "run", "--config="+configFileName)
+
+	// Rename to something unique
+	err = os.Rename(c.dir+"/telemetry-envoy", c.dir+"/e2et-envoy-" + c.tenantId)
+	checkErr(err, "renaming envoy")
+	cmd = exec.Command(c.dir+"/e2et-envoy-" + c.tenantId, "run", "--config="+configFileName)
 	cmd.Dir = c.dir
 	cmd.Stdout, err = os.Create(c.dir + "/envoyStdout.log")
 	checkErr(err, "redirecting stdout")
@@ -396,8 +400,6 @@ func checkForEvents(c config, eventFound chan bool) {
 	var r *kafka.Reader
 	finishedMap := make(map[string]bool)
 	finishedMap["net"] = false
-//gbj remove	
-finishedMap["http"] = false
 	if c.mode != "prod" {
 		r = kafka.NewReader(kafka.ReaderConfig{
 			Brokers:  c.kafkaBrokers,
@@ -407,7 +409,6 @@ finishedMap["http"] = false
 		})
 
 	} else {
-		finishedMap["http"] = false
 		cert, err := tls.LoadX509KeyPair(c.certFile, c.keyFile)
 		checkErr(err, "loading client cert")
 		caCert, err := ioutil.ReadFile(c.caFile)
@@ -471,9 +472,6 @@ func createMonitors(c config) {
 	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/monitors/"
 	data := fmt.Sprintf(netMonitorData, runtime.GOOS, c.privateZoneId, c.port)
 	_ = doReq("POST", url, data, "creating net monitor", c.regularToken)
-//gbj remove
-	data = fmt.Sprintf(httpMonitorData, runtime.GOOS, c.privateZoneId)
-	_ = doReq("POST", url, data, "creating http monitor", c.regularToken)
 	log.Println("monitors created")
 
 }
@@ -541,7 +539,9 @@ func checkPresenceMonitor(c config) {
 type webServer struct {
 	portString *string
 	cfgFileName *string
+	sem *semaphore.Weighted
 }
+
 func (w *webServer)start() {
 	log.Info("starting web server: " + fmt.Sprintf(":%s", *w.portString))
 	serverMux := http.NewServeMux()
@@ -557,18 +557,22 @@ func (w *webServer)start() {
 
 func (w *webServer) handler(wr http.ResponseWriter, r *http.Request) {
 	log.Info("starting request")
+	if !w.sem.TryAcquire(1) {
+		wr.WriteHeader(http.StatusLocked)
+		_, _ = wr.Write([]byte("e2et already running."))
+	}
 	buf := new(bytes.Buffer)
 	cmd := exec.Command(os.Args[0], "--config=" + *w.cfgFileName)
 	cmd.Stdout = buf
 	cmd.Stderr = buf
 	err := cmd.Run()
 	if err != nil {
-		wr.WriteHeader(http.StatusMethodNotAllowed)
+		log.Error("envoy exited with error: " + err.Error())
+		wr.WriteHeader(http.StatusInternalServerError)
 		_, _ = wr.Write([]byte(buf.String()))
 		
-	} else {
-		_, _ = wr.Write([]byte(buf.String()))
 	}
+	w.sem.Release(1)
 	log.Info("finished request")
 
 }
