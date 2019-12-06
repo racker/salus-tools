@@ -19,6 +19,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -31,7 +32,8 @@ import (
 	"github.com/spf13/viper"
 	"html/template"
 	"io/ioutil"
-	"log"
+	log "github.com/sirupsen/logrus"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -47,10 +49,6 @@ func initConfig() config {
 	viper.SetEnvPrefix("e2et")
 	viper.AutomaticEnv() // read in environment variables that match
 
-	cfgFile := flag.String("config", "config.yml", "config file")
-	flag.Parse()
-	viper.SetConfigFile(*cfgFile)
-	err := viper.ReadInConfig()
 	var c config
 	c.mode = viper.GetString("mode")
 	c.currentUUID = uuid.NewV4()
@@ -74,6 +72,7 @@ func initConfig() config {
 	dir, err := ioutil.TempDir("", "e2et")
 	checkErr(err, "error creating temp dir")
 	c.dir = dir
+	fmt.Println("Temp dir is : " + c.dir)
 	c.kafkaBrokers = strings.Split(viper.GetString("kafka.brokers"), ",")
 	c.eventTopic = viper.GetString("event.topic")
 	c.identityUrl = viper.GetString("identity.url")
@@ -98,9 +97,25 @@ func checkErr(err error, message string) {
 }
 
 func main() {
+	cfgFileName := flag.String("config", "config.yml", "config file")
+	portString := flag.String("web-server-port", "", "port for web server")
+	flag.Parse()
+	viper.SetConfigFile(*cfgFileName)
+	viper.ReadInConfig()
+
+	if *portString != "" {
+		w := webServer{portString, cfgFileName}
+		fmt.Println("gbjstarting web server")
+		go w.start()
+	} else {
+		runTest()
+	}
+	for {}
+}
+
+func runTest() {
 	log.Println("Starting e2et")
 	c := initConfig()
-	fmt.Println("Temp dir is : " + c.dir)
 
 	releaseId := getReleases(c)
 	deleteAgentInstalls(c)
@@ -370,7 +385,7 @@ func checkForEvents(c config, eventFound chan bool) {
 	finishedMap["net"] = false
 //gbj remove	
 finishedMap["http"] = false
-	if c.mode == "local" {
+	if c.mode != "prod" {
 		r = kafka.NewReader(kafka.ReaderConfig{
 			Brokers:  c.kafkaBrokers,
 			Topic:    c.eventTopic,
@@ -508,4 +523,37 @@ func checkPresenceMonitor(c config) {
 	url := c.adminApiUrl + "api/presence-monitor/partitions/"
 	_ = doReq("GET", url, "", "getting presence monitor partitions", c.adminToken)
 	log.Println("got presence monitor partitions")
+}
+
+type webServer struct {
+	portString *string
+	cfgFileName *string
+}
+func (w *webServer)start() {
+	fmt.Println("starting web server: " + fmt.Sprintf(":%s", *w.portString))
+	serverMux := http.NewServeMux()
+	serverMux.HandleFunc("/", w.handler)
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%s", *w.portString))
+	if err != nil {
+		log.Fatalf("couldn't create e2et web server: " )
+	}
+	log.Info("started e2et webServer")
+	err = http.Serve(listener, serverMux)
+	log.Fatalf("e2et server error %v", err)
+}
+
+func (w *webServer) handler(wr http.ResponseWriter, r *http.Request) {
+	buf := new(bytes.Buffer)
+	cmd := exec.Command(os.Args[0], "--config=" + *w.cfgFileName)
+	cmd.Stdout = buf
+	cmd.Stderr = buf
+	err := cmd.Run()
+	if err != nil {
+		wr.WriteHeader(http.StatusMethodNotAllowed)
+		_, _ = wr.Write([]byte(buf.String()))
+		
+	} else {
+		_, _ = wr.Write([]byte(buf.String()))
+	}
+
 }
