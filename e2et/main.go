@@ -90,6 +90,7 @@ func initConfig() config {
 	c.adminPassword = viper.GetString("admin.password")
 	c.regularToken = getToken(c, c.regularId, c.regularApiKey, "")
 	c.adminToken = getToken(c, c.adminId, c.adminApiKey, c.adminPassword)
+	c.envoyExeName = "e2et-envoy-" + c.tenantId
 	return c
 }
 func checkErr(err error, message string) {
@@ -118,17 +119,7 @@ func main() {
 func runTest() {
 	log.Println("Starting e2et")
 	c := initConfig()
-	processes, err := process.Processes()
-	checkErr(err, "getting processes")
-	for _, p := range processes {
-		name, _ := p.Name()
-		if strings.Contains(name, "e2et-envoy") {
-			c, _ := p.Cmdline()
-			log.Info("killing envoy: " + c)
-			p.Kill()
-		}
-	}
-
+	deleteEnvoyProcesses(c)
 	releaseId := getReleases(c)
 	deleteAgentInstalls(c)
 	deleteResources(c)
@@ -196,9 +187,9 @@ func initEnvoy(c config, releaseId string) (cmd *exec.Cmd) {
 	checkErr(err, "decompressing tarball")
 
 	// Rename to something unique
-	err = os.Rename(c.dir+"/telemetry-envoy", c.dir+"/e2et-envoy-" + c.tenantId)
+	err = os.Rename(c.dir+"/telemetry-envoy", c.dir+"/" + c.envoyExeName)
 	checkErr(err, "renaming envoy")
-	cmd = exec.Command(c.dir+"/e2et-envoy-" + c.tenantId, "run", "--config="+configFileName)
+	cmd = exec.Command(c.dir+"/" + c.envoyExeName, "run", "--config="+configFileName)
 	cmd.Dir = c.dir
 	cmd.Stdout, err = os.Create(c.dir + "/envoyStdout.log")
 	checkErr(err, "redirecting stdout")
@@ -400,6 +391,7 @@ func checkForEvents(c config, eventFound chan bool) {
 	var r *kafka.Reader
 	finishedMap := make(map[string]bool)
 	finishedMap["net"] = false
+	finishedMap["http"] = false
 	if c.mode != "prod" {
 		r = kafka.NewReader(kafka.ReaderConfig{
 			Brokers:  c.kafkaBrokers,
@@ -536,6 +528,18 @@ func checkPresenceMonitor(c config) {
 	log.Println("got presence monitor partitions")
 }
 
+func deleteEnvoyProcesses(c config) {
+	processes, err := process.Processes()
+	checkErr(err, "getting processes")
+	for _, p := range processes {
+		name, _ := p.Name()
+		if strings.Contains(name, c.envoyExeName) {
+			c, _ := p.Cmdline()
+			log.Info("killing envoy: " + c)
+			p.Kill()
+		}
+	}
+}
 type webServer struct {
 	portString *string
 	cfgFileName *string
@@ -567,7 +571,7 @@ func (w *webServer) handler(wr http.ResponseWriter, r *http.Request) {
 	cmd.Stderr = buf
 	err := cmd.Run()
 	if err != nil {
-		log.Error("envoy exited with error: " + err.Error())
+		log.Error("e2et exited with error: " + err.Error())
 		wr.WriteHeader(http.StatusInternalServerError)
 		_, _ = wr.Write([]byte(buf.String()))
 		
