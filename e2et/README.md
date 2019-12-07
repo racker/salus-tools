@@ -24,7 +24,10 @@ E2ET_ADMIN_PASSWORD    the password of admin user account
 Only one of the two ADMIN env vars is required.
 
 ## Curl commands
-The test doesn't use curl, but as it invokes each api command it prints out the analogous curl, to allow invocation by hand if that seems useful.  The tokens are not printed out by default, but you can print them by adding this env var:
+The test doesn't use curl for the api calls, but as it invokes each api command it prints out the analogous curl, to allow invocation by hand if that seems useful.  The tokens are not printed out by default, but you can print them by adding this env var:
 ```
 export E2ET_PRINT_TOKENS=true
 ```
+
+## Webserver support
+By starting with the *--web-server-port=xxx* command line parameter, the program starts a webserver at the corresponding port.  An http get of that port will run the e2et and return 200 if it succeeds or 500, along with the log messages if it fails.
