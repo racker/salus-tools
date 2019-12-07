@@ -20,6 +20,7 @@ package main
 
 import (
 	"github.com/satori/go.uuid"
+	"golang.org/x/sync/semaphore"
 	"time"
 )
 
@@ -296,3 +297,10 @@ type CreatePolicyMonitorResp struct {
 	CreatedTimestamp time.Time `json:"createdTimestamp"`
 	UpdatedTimestamp time.Time `json:"updatedTimestamp"`
 }
+
+type webServer struct {
+	portString  *string
+	cfgFileName *string
+	sem         *semaphore.Weighted
+}
+

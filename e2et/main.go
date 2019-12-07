@@ -108,12 +108,9 @@ func main() {
 
 	if *portString != "" {
 		w := webServer{portString, cfgFileName, semaphore.NewWeighted(1)}
-		log.Info("starting web server")
-		go w.start()
+		w.start()
 	} else {
 		runTest()
-	}
-	for {
 	}
 }
 
@@ -142,7 +139,6 @@ func runTest() {
 	select {
 	case <-eventFound:
 		log.Println("events returned from kafka successfully")
-		os.Exit(0)
 	case <-time.After(5 * time.Minute):
 		log.Fatal("Timed out waiting for events")
 	}
@@ -542,12 +538,6 @@ func deleteEnvoyProcesses(c config) {
 	}
 }
 
-type webServer struct {
-	portString  *string
-	cfgFileName *string
-	sem         *semaphore.Weighted
-}
-
 func (w *webServer) start() {
 	log.Info("starting web server: " + fmt.Sprintf(":%s", *w.portString))
 	serverMux := http.NewServeMux()
@@ -562,7 +552,6 @@ func (w *webServer) start() {
 }
 
 func (w *webServer) handler(wr http.ResponseWriter, r *http.Request) {
-	log.Info("starting request")
 	if !w.sem.TryAcquire(1) {
 		log.Error("e2et already running")
 		wr.WriteHeader(http.StatusLocked)
@@ -570,6 +559,7 @@ func (w *webServer) handler(wr http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer w.sem.Release(1)
+	log.Info("starting request")
 	buf := new(bytes.Buffer)
 	cmd := exec.Command(os.Args[0], "--config="+*w.cfgFileName)
 	cmd.Stdout = buf
