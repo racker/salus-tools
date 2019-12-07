@@ -562,9 +562,12 @@ func (w *webServer)start() {
 func (w *webServer) handler(wr http.ResponseWriter, r *http.Request) {
 	log.Info("starting request")
 	if !w.sem.TryAcquire(1) {
+		log.Error("e2et already running")
 		wr.WriteHeader(http.StatusLocked)
-		_, _ = wr.Write([]byte("e2et already running."))
+		_, _ = wr.Write([]byte("e2et already running.\n"))
+		return
 	}
+	defer 	w.sem.Release(1)
 	buf := new(bytes.Buffer)
 	cmd := exec.Command(os.Args[0], "--config=" + *w.cfgFileName)
 	cmd.Stdout = buf
@@ -573,10 +576,7 @@ func (w *webServer) handler(wr http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Error("e2et exited with error: " + err.Error())
 		wr.WriteHeader(http.StatusInternalServerError)
-		_, _ = wr.Write([]byte(buf.String()))
-		
+		_, _ = wr.Write([]byte(buf.String() + "\n"))
 	}
-	w.sem.Release(1)
 	log.Info("finished request")
-
 }
