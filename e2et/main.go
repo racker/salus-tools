@@ -29,10 +29,12 @@ import (
 	"github.com/coreos/go-semver/semver"
 	"github.com/satori/go.uuid"
 	"github.com/segmentio/kafka-go"
+	"github.com/shirou/gopsutil/process"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"golang.org/x/sync/semaphore"
 	"html/template"
 	"io/ioutil"
-	log "github.com/sirupsen/logrus"
 	"net"
 	"net/http"
 	"os"
@@ -41,8 +43,6 @@ import (
 	"runtime"
 	"strings"
 	"time"
-        "github.com/shirou/gopsutil/process"
-	"golang.org/x/sync/semaphore"
 )
 
 func initConfig() config {
@@ -113,7 +113,8 @@ func main() {
 	} else {
 		runTest()
 	}
-	for {}
+	for {
+	}
 }
 
 func runTest() {
@@ -169,7 +170,7 @@ func initEnvoy(c config, releaseId string) (cmd *exec.Cmd) {
 
 	err = tmpl.Execute(f, TemplateFields{c.resourceId, c.privateZoneId,
 		c.certDir, c.regularApiKey, c.regularId, c.authUrl, c.ambassadorAddress,
-	c.identityUrl})
+		c.identityUrl})
 	checkErr(err, "creating envoy template")
 	err = f.Close()
 	checkErr(err, "closing envoy config file: "+configFileName)
@@ -180,16 +181,16 @@ func initEnvoy(c config, releaseId string) (cmd *exec.Cmd) {
 		tarballURL = "https://github.com/racker/salus-telemetry-envoy/releases/download/0.13.0/telemetry-envoy_0.13.0_Linux_x86_64.tar.gz"
 	}
 	cmd = exec.Command("curl", "-L", "-o", c.dir+"/envoy.tar.gz", tarballURL)
-	err = cmd.Run();
+	err = cmd.Run()
 	checkErr(err, "downloading tar")
 	cmd = exec.Command("tar", "-xf", c.dir+"/envoy.tar.gz", "-C", c.dir)
-	err = cmd.Run();
+	err = cmd.Run()
 	checkErr(err, "decompressing tarball")
 
 	// Rename to something unique
-	err = os.Rename(c.dir+"/telemetry-envoy", c.dir+"/" + c.envoyExeName)
+	err = os.Rename(c.dir+"/telemetry-envoy", c.dir+"/"+c.envoyExeName)
 	checkErr(err, "renaming envoy")
-	cmd = exec.Command(c.dir+"/" + c.envoyExeName, "run", "--config="+configFileName)
+	cmd = exec.Command(c.dir+"/"+c.envoyExeName, "run", "--config="+configFileName)
 	cmd.Dir = c.dir
 	cmd.Stdout, err = os.Create(c.dir + "/envoyStdout.log")
 	checkErr(err, "redirecting stdout")
@@ -540,19 +541,20 @@ func deleteEnvoyProcesses(c config) {
 		}
 	}
 }
+
 type webServer struct {
-	portString *string
+	portString  *string
 	cfgFileName *string
-	sem *semaphore.Weighted
+	sem         *semaphore.Weighted
 }
 
-func (w *webServer)start() {
+func (w *webServer) start() {
 	log.Info("starting web server: " + fmt.Sprintf(":%s", *w.portString))
 	serverMux := http.NewServeMux()
 	serverMux.HandleFunc("/", w.handler)
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%s", *w.portString))
 	if err != nil {
-		log.Fatalf("couldn't create e2et web server: " )
+		log.Fatalf("couldn't create e2et web server: ")
 	}
 	log.Info("started e2et webServer")
 	err = http.Serve(listener, serverMux)
@@ -567,9 +569,9 @@ func (w *webServer) handler(wr http.ResponseWriter, r *http.Request) {
 		_, _ = wr.Write([]byte("e2et already running.\n"))
 		return
 	}
-	defer 	w.sem.Release(1)
+	defer w.sem.Release(1)
 	buf := new(bytes.Buffer)
-	cmd := exec.Command(os.Args[0], "--config=" + *w.cfgFileName)
+	cmd := exec.Command(os.Args[0], "--config="+*w.cfgFileName)
 	cmd.Stdout = buf
 	cmd.Stderr = buf
 	err := cmd.Run()
