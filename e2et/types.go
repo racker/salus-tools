@@ -51,37 +51,37 @@ type TemplateFields = struct {
 	IdentityUrl       string
 }
 type config = struct {
-	mode              string
-	currentUUID       uuid.UUID
-	id                string
-	privateZoneId     string
-	resourceId        string
-	tenantId          string
-	regularId         string
-	adminId           string
-	publicApiUrl      string
-	adminApiUrl       string
-	agentReleaseUrl   string
-	certDir           string
-	regularToken      string
-	adminToken        string
-	dir               string
-	kafkaBrokers      []string
-	eventTopic        string
-	port              string
-	certFile          string
-	keyFile           string
-	caFile            string
-	regularApiKey     string
-	adminApiKey       string
-	adminPassword     string
-	publicZoneId      string
-	identityUrl       string
-	authUrl           string
-	ambassadorAddress string
-	envoyExeName      string
-	envoyTimeout      int
-	envoyTarballLinux string
+	mode               string
+	currentUUID        uuid.UUID
+	id                 string
+	privateZoneId      string
+	resourceId         string
+	tenantId           string
+	regularId          string
+	adminId            string
+	publicApiUrl       string
+	adminApiUrl        string
+	agentReleaseUrl    string
+	certDir            string
+	regularToken       string
+	adminToken         string
+	dir                string
+	kafkaBrokers       []string
+	eventTopic         string
+	port               string
+	certFile           string
+	keyFile            string
+	caFile             string
+	regularApiKey      string
+	adminApiKey        string
+	adminPassword      string
+	publicZoneId       string
+	identityUrl        string
+	authUrl            string
+	ambassadorAddress  string
+	envoyExeName       string
+	envoyTimeout       int
+	envoyTarballLinux  string
 	envoyTarballDarwin string
 }
 

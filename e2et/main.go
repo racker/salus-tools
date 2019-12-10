@@ -95,7 +95,7 @@ func initConfig() config {
 	c.envoyTarballDarwin = viper.GetString("envoy.tarball.darwin")
 	c.envoyTarballLinux = viper.GetString("envoy.tarball.linux")
 	c.envoyTimeout, err = strconv.Atoi(viper.GetString("envoy.timeout"))
-	checkErr(err, "error converting timeout: " + viper.GetString("envoy.timeout"))
+	checkErr(err, "error converting timeout: "+viper.GetString("envoy.timeout"))
 	return c
 }
 func checkErr(err error, message string) {
