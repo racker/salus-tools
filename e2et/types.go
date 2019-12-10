@@ -80,7 +80,7 @@ type config = struct {
 	authUrl            string
 	ambassadorAddress  string
 	envoyExeName       string
-	envoyTimeout       int
+	envoyTimeout       time.Duration
 	envoyTarballLinux  string
 	envoyTarballDarwin string
 }

@@ -41,7 +41,6 @@ import (
 	"os/exec"
 	"path"
 	"runtime"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -94,7 +93,7 @@ func initConfig() config {
 	c.envoyExeName = "e2et-envoy-" + c.tenantId
 	c.envoyTarballDarwin = viper.GetString("envoy.tarball.darwin")
 	c.envoyTarballLinux = viper.GetString("envoy.tarball.linux")
-	c.envoyTimeout, err = strconv.Atoi(viper.GetString("envoy.timeout"))
+	c.envoyTimeout = viper.GetDuration("envoy.timeout")
 	checkErr(err, "error converting timeout: "+viper.GetString("envoy.timeout"))
 	return c
 }
@@ -144,7 +143,7 @@ func runTest() {
 	select {
 	case <-eventFound:
 		log.Println("events returned from kafka successfully")
-	case <-time.After(5 * time.Minute):
+	case <-time.After(c.envoyTimeout):
 		log.Fatal("Timed out waiting for events")
 	}
 
