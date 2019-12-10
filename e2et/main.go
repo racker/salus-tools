@@ -41,6 +41,7 @@ import (
 	"os/exec"
 	"path"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -91,6 +92,10 @@ func initConfig() config {
 	c.regularToken = getToken(c, c.regularId, c.regularApiKey, "")
 	c.adminToken = getToken(c, c.adminId, c.adminApiKey, c.adminPassword)
 	c.envoyExeName = "e2et-envoy-" + c.tenantId
+	c.envoyTarballDarwin = viper.GetString("envoy.tarball.darwin")
+	c.envoyTarballLinux = viper.GetString("envoy.tarball.linux")
+	c.envoyTimeout, err = strconv.Atoi(viper.GetString("envoy.timeout"))
+	checkErr(err, "error converting timeout: " + viper.GetString("envoy.timeout"))
 	return c
 }
 func checkErr(err error, message string) {
@@ -172,9 +177,9 @@ func initEnvoy(c config, releaseId string) (cmd *exec.Cmd) {
 	checkErr(err, "closing envoy config file: "+configFileName)
 	var tarballURL string
 	if runtime.GOOS == "darwin" {
-		tarballURL = "https://github.com/racker/salus-telemetry-envoy/releases/download/0.13.0/telemetry-envoy_0.13.0_Darwin_x86_64.tar.gz"
+		tarballURL = c.envoyTarballDarwin
 	} else {
-		tarballURL = "https://github.com/racker/salus-telemetry-envoy/releases/download/0.13.0/telemetry-envoy_0.13.0_Linux_x86_64.tar.gz"
+		tarballURL = c.envoyTarballLinux
 	}
 	cmd = exec.Command("curl", "-L", "-o", c.dir+"/envoy.tar.gz", tarballURL)
 	err = cmd.Run()
