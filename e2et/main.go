@@ -19,6 +19,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -28,10 +29,13 @@ import (
 	"github.com/coreos/go-semver/semver"
 	"github.com/satori/go.uuid"
 	"github.com/segmentio/kafka-go"
+	"github.com/shirou/gopsutil/process"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"golang.org/x/sync/semaphore"
 	"html/template"
 	"io/ioutil"
-	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -44,26 +48,20 @@ import (
 func initConfig() config {
 	replacer := strings.NewReplacer(".", "_", "-", "_")
 	viper.SetEnvKeyReplacer(replacer)
-	viper.SetEnvPrefix("E2ET")
+	viper.SetEnvPrefix("e2et")
 	viper.AutomaticEnv() // read in environment variables that match
 
-	cfgFile := flag.String("config", "config.yml", "config file")
-	flag.Parse()
-	viper.SetConfigFile(*cfgFile)
-	err := viper.ReadInConfig()
-	checkErr(err, "Config file not found "+*cfgFile)
-	log.Println("loaded: " + *cfgFile)
 	var c config
 	c.mode = viper.GetString("mode")
 	c.currentUUID = uuid.NewV4()
 	c.id = strings.Replace(c.currentUUID.String(), "-", "", -1)
 	c.privateZoneId = "privateZone_" + c.id
 	c.resourceId = "resourceId_" + c.id
-	c.tenantId = viper.GetString("tenantId")
-	c.publicApiUrl = viper.GetString("publicApiUrl")
-	c.adminApiUrl = viper.GetString("adminApiUrl")
+	c.tenantId = viper.GetString("tenant.id")
+	c.publicApiUrl = viper.GetString("public.api.url")
+	c.adminApiUrl = viper.GetString("admin.api.url")
 	c.agentReleaseUrl = c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/agent-releases"
-	certDir := viper.GetString("certDir")
+	certDir := viper.GetString("cert.dir")
 
 	if !strings.HasPrefix(certDir, "/") {
 		wd, err := os.Getwd()
@@ -71,26 +69,32 @@ func initConfig() config {
 		certDir = path.Join(wd, certDir)
 	}
 	c.certDir = certDir
-	c.regularId = viper.GetString("regularId")
-	c.adminId = viper.GetString("adminId")
+	c.regularId = viper.GetString("regular.id")
+	c.adminId = viper.GetString("admin.id")
 	dir, err := ioutil.TempDir("", "e2et")
 	checkErr(err, "error creating temp dir")
 	c.dir = dir
-	c.kafkaBrokers = viper.GetStringSlice("kafkaBrokers")
-	c.eventTopic = viper.GetString("eventTopic")
-	c.identityUrl = viper.GetString("identityUrl")
-	c.authUrl = viper.GetString("authUrl")
-	c.ambassadorAddress = viper.GetString("ambassadorAddress")
+	log.Info("Temp dir is : " + c.dir)
+	c.kafkaBrokers = strings.Split(viper.GetString("kafka.brokers"), ",")
+	c.eventTopic = viper.GetString("event.topic")
+	c.identityUrl = viper.GetString("identity.url")
+	c.authUrl = viper.GetString("auth.url")
+	c.ambassadorAddress = viper.GetString("ambassador.address")
 	c.port = "8222"
 	c.publicZoneId = "public/us_central_1"
-	c.certFile = viper.GetString("certFile")
-	c.keyFile = viper.GetString("keyFile")
-	c.caFile = viper.GetString("caFile")
-	c.regularApiKey = os.Getenv("E2ET_REGULAR_API_KEY")
-	c.adminApiKey = os.Getenv("E2ET_ADMIN_API_KEY")
-	c.adminPassword = os.Getenv("E2ET_ADMIN_PASSWORD")
+	c.certFile = viper.GetString("cert.file")
+	c.keyFile = viper.GetString("key.file")
+	c.caFile = viper.GetString("ca.file")
+	c.regularApiKey = viper.GetString("regular.api.key")
+	c.adminApiKey = viper.GetString("admin.api.key")
+	c.adminPassword = viper.GetString("admin.password")
 	c.regularToken = getToken(c, c.regularId, c.regularApiKey, "")
 	c.adminToken = getToken(c, c.adminId, c.adminApiKey, c.adminPassword)
+	c.envoyExeName = "e2et-envoy-" + c.tenantId
+	c.envoyTarballDarwin = viper.GetString("envoy.tarball.darwin")
+	c.envoyTarballLinux = viper.GetString("envoy.tarball.linux")
+	c.envoyTimeout = viper.GetDuration("envoy.timeout")
+	checkErr(err, "error converting timeout: "+viper.GetString("envoy.timeout"))
 	return c
 }
 func checkErr(err error, message string) {
@@ -100,10 +104,24 @@ func checkErr(err error, message string) {
 }
 
 func main() {
+	cfgFileName := flag.String("config", "config.yml", "config file")
+	portString := flag.String("web-server-port", "", "port for web server")
+	flag.Parse()
+	viper.SetConfigFile(*cfgFileName)
+	viper.ReadInConfig()
+
+	if *portString != "" {
+		w := webServer{portString, cfgFileName, semaphore.NewWeighted(1)}
+		w.start()
+	} else {
+		runTest()
+	}
+}
+
+func runTest() {
 	log.Println("Starting e2et")
 	c := initConfig()
-	fmt.Println("Temp dir is : " + c.dir)
-
+	deleteEnvoyProcesses(c)
 	releaseId := getReleases(c)
 	deleteAgentInstalls(c)
 	deleteResources(c)
@@ -125,7 +143,7 @@ func main() {
 	select {
 	case <-eventFound:
 		log.Println("events returned from kafka successfully")
-	case <-time.After(10 * time.Minute):
+	case <-time.After(c.envoyTimeout):
 		log.Fatal("Timed out waiting for events")
 	}
 
@@ -151,11 +169,28 @@ func initEnvoy(c config, releaseId string) (cmd *exec.Cmd) {
 	checkErr(err, "parsing envoy template")
 
 	err = tmpl.Execute(f, TemplateFields{c.resourceId, c.privateZoneId,
-		c.certDir, c.regularApiKey, c.regularId, c.authUrl, c.ambassadorAddress})
+		c.certDir, c.regularApiKey, c.regularId, c.authUrl, c.ambassadorAddress,
+		c.identityUrl})
 	checkErr(err, "creating envoy template")
 	err = f.Close()
 	checkErr(err, "closing envoy config file: "+configFileName)
-	cmd = exec.Command(os.Getenv("GOPATH")+"/bin/telemetry-envoy", "run", "--config="+configFileName)
+	var tarballURL string
+	if runtime.GOOS == "darwin" {
+		tarballURL = c.envoyTarballDarwin
+	} else {
+		tarballURL = c.envoyTarballLinux
+	}
+	cmd = exec.Command("curl", "-L", "-o", c.dir+"/envoy.tar.gz", tarballURL)
+	err = cmd.Run()
+	checkErr(err, "downloading tar")
+	cmd = exec.Command("tar", "-xf", c.dir+"/envoy.tar.gz", "-C", c.dir)
+	err = cmd.Run()
+	checkErr(err, "decompressing tarball")
+
+	// Rename to something unique
+	err = os.Rename(c.dir+"/telemetry-envoy", c.dir+"/"+c.envoyExeName)
+	checkErr(err, "renaming envoy")
+	cmd = exec.Command(c.dir+"/"+c.envoyExeName, "run", "--config="+configFileName)
 	cmd.Dir = c.dir
 	cmd.Stdout, err = os.Create(c.dir + "/envoyStdout.log")
 	checkErr(err, "redirecting stdout")
@@ -357,7 +392,8 @@ func checkForEvents(c config, eventFound chan bool) {
 	var r *kafka.Reader
 	finishedMap := make(map[string]bool)
 	finishedMap["net"] = false
-	if c.mode == "local" {
+	finishedMap["http"] = false
+	if c.mode != "prod" {
 		r = kafka.NewReader(kafka.ReaderConfig{
 			Brokers:  c.kafkaBrokers,
 			Topic:    c.eventTopic,
@@ -366,7 +402,6 @@ func checkForEvents(c config, eventFound chan bool) {
 		})
 
 	} else {
-		finishedMap["http"] = false
 		cert, err := tls.LoadX509KeyPair(c.certFile, c.keyFile)
 		checkErr(err, "loading client cert")
 		caCert, err := ioutil.ReadFile(c.caFile)
@@ -477,7 +512,7 @@ func createPolicyMonitor(c config) {
 	monitorUrl := c.adminApiUrl + "api/policy-monitors/"
 
 	// Now create new policy monitor
-	data := fmt.Sprintf(httpMonitorData, runtime.GOOS, c.publicZoneId, c.port)
+	data := fmt.Sprintf(httpMonitorData, runtime.GOOS, c.publicZoneId)
 	body := doReq("POST", monitorUrl, data, "creating policy monitor", c.adminToken)
 	var resp CreatePolicyMonitorResp
 	err := json.Unmarshal(body, &resp)
@@ -492,4 +527,52 @@ func checkPresenceMonitor(c config) {
 	url := c.adminApiUrl + "api/presence-monitor/partitions/"
 	_ = doReq("GET", url, "", "getting presence monitor partitions", c.adminToken)
 	log.Println("got presence monitor partitions")
+}
+
+func deleteEnvoyProcesses(c config) {
+	processes, err := process.Processes()
+	checkErr(err, "getting processes")
+	for _, p := range processes {
+		name, _ := p.Name()
+		if strings.Contains(name, c.envoyExeName) {
+			c, _ := p.Cmdline()
+			log.Info("killing envoy: " + c)
+			p.Kill()
+		}
+	}
+}
+
+func (w *webServer) start() {
+	log.Info("starting web server: " + fmt.Sprintf(":%s", *w.portString))
+	serverMux := http.NewServeMux()
+	serverMux.HandleFunc("/", w.handler)
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%s", *w.portString))
+	if err != nil {
+		log.Fatalf("couldn't create e2et web server: ")
+	}
+	log.Info("started e2et webServer")
+	err = http.Serve(listener, serverMux)
+	log.Fatalf("e2et server error %v", err)
+}
+
+func (w *webServer) handler(wr http.ResponseWriter, r *http.Request) {
+	if !w.sem.TryAcquire(1) {
+		log.Error("e2et already running")
+		wr.WriteHeader(http.StatusLocked)
+		_, _ = wr.Write([]byte("e2et already running.\n"))
+		return
+	}
+	defer w.sem.Release(1)
+	log.Info("starting request")
+	buf := new(bytes.Buffer)
+	cmd := exec.Command(os.Args[0], "--config="+*w.cfgFileName)
+	cmd.Stdout = buf
+	cmd.Stderr = buf
+	err := cmd.Run()
+	if err != nil {
+		log.Error("e2et exited with error: " + err.Error())
+		wr.WriteHeader(http.StatusInternalServerError)
+		_, _ = wr.Write([]byte(buf.String() + "\n"))
+	}
+	log.Info("finished request")
 }

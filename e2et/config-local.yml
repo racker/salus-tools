@@ -1,8 +1,11 @@
 mode: local
-tenantId: aaaaaa
-publicApiUrl: http://localhost:8080/
-adminApiUrl: http://localhost:8888/
-certDir: ../../dev/certs
-kafkaBrokers:
+tenant.id: aaaaaa
+public.api.url: http://localhost:8080/
+admin.api.url: http://localhost:8888/
+cert.dir: ../../dev/certs
+kafka.brokers:
   - localhost:9092
-eventTopic: salus.events.json
+event.topic: salus.events.json
+event.timeout: 5m
+envoy.tarball.linux: https://github.com/racker/salus-telemetry-envoy/releases/download/0.13.0/telemetry-envoy_0.13.0_Linux_x86_64.tar.gz
+envoy.tarball.darwin: https://github.com/racker/salus-telemetry-envoy/releases/download/0.13.0/telemetry-envoy_0.13.0_Darwin_x86_64.tar.gz
