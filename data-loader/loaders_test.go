@@ -87,7 +87,7 @@ func TestLoaderImpl_LoadAll(t *testing.T) {
 
 	// Finally...execute method under test
 
-	err = loader.LoadAll("testdata/content")
+	stats, err := loader.LoadAll("testdata/content")
 	require.NoError(t, err)
 
 	assert.Len(t, requests, 5)
@@ -124,6 +124,11 @@ func TestLoaderImpl_LoadAll(t *testing.T) {
 	assertJsonPath(t, postedJson[0], "$.version", "1.11.0")
 
 	assertJsonPath(t, postedJson[1], "$.name", "testing-definition")
+
+	assert.NotNil(t, stats)
+	assert.Equal(t, 2, stats.Created)
+	assert.Equal(t, 1, stats.SkippedExisting)
+	assert.Equal(t, 0, stats.FailedToCreate)
 }
 
 func assertJsonPath(t *testing.T, postedJson interface{}, path string, expected interface{}) {

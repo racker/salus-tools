@@ -17,8 +17,10 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/google/go-github/v28/github"
+	"github.com/racker/go-restclient"
 	"go.uber.org/zap"
 	"net/http"
 	"reflect"
@@ -84,11 +86,20 @@ func (s *WebhookServer) handleWebhook(w http.ResponseWriter, r *http.Request) {
 
 	switch event := event.(type) {
 	case *github.PushEvent:
-		err := s.handlePushEvent(github.DeliveryID(r), event)
+		stats, err := s.handlePushEvent(github.DeliveryID(r), event)
 		if err != nil {
 			s.log.Warnw("failed to handle push event", "err", err)
 			s.writeErrResponse(http.StatusInternalServerError, w, err)
 			return
+		}
+
+		statsJson, err := json.Marshal(stats)
+		if err != nil {
+			s.log.Warnw("failed marshal stats response",
+				"err", err, "stats", stats)
+		} else {
+			w.Header().Set("Content-Type", string(restclient.JsonType))
+			_, _ = w.Write(statsJson)
 		}
 
 	default:
@@ -108,7 +119,7 @@ func (s *WebhookServer) writeErrResponse(statusCode int, w http.ResponseWriter, 
 	}
 }
 
-func (s *WebhookServer) handlePushEvent(deliveryId string, event *github.PushEvent) error {
+func (s *WebhookServer) handlePushEvent(deliveryId string, event *github.PushEvent) (*LoaderStats, error) {
 	ref := event.GetRef()
 	pusher := event.GetPusher().GetName()
 	cloneURL := event.GetRepo().GetCloneURL()
@@ -117,26 +128,26 @@ func (s *WebhookServer) handlePushEvent(deliveryId string, event *github.PushEve
 	if !s.isApplicableRef(ref) {
 		s.log.Debugw("ignoring push event ref that does not match",
 			"ref", ref, "deliveryId", deliveryId)
-		return nil
+		return nil, nil
 	}
 
 	sourceContent := s.gitContentBuilder(cloneURL, commitId)
 
 	sourceContentPath, err := sourceContent.Prepare()
 	if err != nil {
-		return fmt.Errorf("failed to prepare source content from %s: %w", cloneURL, err)
+		return nil, fmt.Errorf("failed to prepare source content from %s: %w", cloneURL, err)
 	}
 	defer sourceContent.Cleanup()
 
 	s.log.Infow("loading source content for webhook push event",
 		"pusher", pusher, "ref", ref, "cloneURL", cloneURL, "commitId", commitId,
 		"deliveryId", deliveryId)
-	err = s.loader.LoadAll(sourceContentPath)
+	stats, err := s.loader.LoadAll(sourceContentPath)
 	if err != nil {
-		return fmt.Errorf("failed load content: %w", err)
+		return nil, fmt.Errorf("failed load content: %w", err)
 	}
 
-	return nil
+	return stats, nil
 }
 
 func (s *WebhookServer) isApplicableRef(ref string) bool {
