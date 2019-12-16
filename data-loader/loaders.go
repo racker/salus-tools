@@ -48,17 +48,18 @@ type PagedContent struct {
 }
 
 type Loader interface {
-	LoadAll(sourceContentPath string) error
+	LoadAll(sourceContentPath string) (*LoaderStats, error)
+}
+
+type LoaderStats struct {
+	SkippedExisting int
+	Created         int
+	FailedToCreate  int
 }
 
 type LoaderImpl struct {
 	log        *zap.SugaredLogger
 	restClient *restclient.Client
-	stats      struct {
-		SkippedExisting int
-		Created         int
-		FailedToCreate  int
-	}
 }
 
 func setupAndLoad(config *Config, log *zap.SugaredLogger, sourceContent SourceContent) error {
@@ -78,7 +79,7 @@ func setupAndLoad(config *Config, log *zap.SugaredLogger, sourceContent SourceCo
 		return fmt.Errorf("failed to create loader: %w", err)
 	}
 
-	err = loader.LoadAll(sourceContentPath)
+	_, err = loader.LoadAll(sourceContentPath)
 	if err != nil {
 		return fmt.Errorf("failed to perform all loading: %w", err)
 	}
@@ -107,9 +108,12 @@ func NewLoader(log *zap.SugaredLogger, identityAuthenticator *IdentityAuthentica
 	}, nil
 }
 
-func (l *LoaderImpl) LoadAll(sourceContentPath string) error {
+func (l *LoaderImpl) LoadAll(sourceContentPath string) (*LoaderStats, error) {
+
+	stats := &LoaderStats{}
+
 	for _, definition := range loaderDefinitions {
-		err := l.load(definition, sourceContentPath)
+		err := l.load(definition, sourceContentPath, stats)
 		if err != nil {
 			l.log.Warnw("failed to process loader definition",
 				"err", err,
@@ -118,12 +122,12 @@ func (l *LoaderImpl) LoadAll(sourceContentPath string) error {
 		}
 	}
 
-	l.log.Infow("finishing loading content", "stats", l.stats)
+	l.log.Infow("loaded content", "stats", stats)
 
-	return nil
+	return stats, nil
 }
 
-func (l *LoaderImpl) load(definition LoaderDefinition, sourceContentPath string) error {
+func (l *LoaderImpl) load(definition LoaderDefinition, sourceContentPath string, stats *LoaderStats) error {
 
 	var content []interface{}
 	var err error
@@ -146,7 +150,7 @@ func (l *LoaderImpl) load(definition LoaderDefinition, sourceContentPath string)
 		"identifiers", identifiers,
 		"definition", definition)
 
-	err = l.processSourceContent(definition, sourceContentPath, identifiers)
+	err = l.processSourceContent(definition, sourceContentPath, identifiers, stats)
 	if err != nil {
 		return fmt.Errorf("failed to process source content: %w", err)
 	}
@@ -238,22 +242,24 @@ func (l *LoaderImpl) extractFieldValues(definition LoaderDefinition, content int
 	return fieldValues, nil
 }
 
-func (l *LoaderImpl) processSourceContent(definition LoaderDefinition, sourceContentPath string, existing UniquenessTracker) error {
+func (l *LoaderImpl) processSourceContent(definition LoaderDefinition, sourceContentPath string,
+	existing UniquenessTracker, stats *LoaderStats) error {
 
-	err := filepath.Walk(filepath.Join(sourceContentPath, definition.Name), func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if !info.IsDir() && filepath.Ext(path) == ".json" {
-			err := l.processSourceContentFile(definition, existing, path)
+	err := filepath.Walk(filepath.Join(sourceContentPath, definition.Name),
+		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
-				return fmt.Errorf("failed to process source content file %s: %w", path, err)
+				return err
 			}
-		} else if !info.IsDir() {
-			l.log.Debugw("skipping non-JSON file", "path", path)
-		} // else ignore directories
-		return nil
-	})
+			if !info.IsDir() && filepath.Ext(path) == ".json" {
+				err := l.processSourceContentFile(definition, existing, path, stats)
+				if err != nil {
+					return fmt.Errorf("failed to process source content file %s: %w", path, err)
+				}
+			} else if !info.IsDir() {
+				l.log.Debugw("skipping non-JSON file", "path", path)
+			} // else ignore directories
+			return nil
+		})
 	if err != nil {
 		return err
 	}
@@ -261,7 +267,8 @@ func (l *LoaderImpl) processSourceContent(definition LoaderDefinition, sourceCon
 	return nil
 }
 
-func (l *LoaderImpl) processSourceContentFile(definition LoaderDefinition, existing UniquenessTracker, path string) error {
+func (l *LoaderImpl) processSourceContentFile(definition LoaderDefinition, existing UniquenessTracker,
+	path string, stats *LoaderStats) error {
 	file, err := os.Open(path)
 	if err != nil {
 		return fmt.Errorf("failed to open source content file: %w", err)
@@ -287,13 +294,13 @@ func (l *LoaderImpl) processSourceContentFile(definition LoaderDefinition, exist
 		if err != nil {
 			l.log.Errorw("failed to load new entity from source content",
 				"err", err, "path", path)
-			l.stats.FailedToCreate += 1
+			stats.FailedToCreate += 1
 			// but continue with others since data loader can always be re-run to pick up missed ones
 		} else {
-			l.stats.Created += 1
+			stats.Created += 1
 		}
 	} else {
-		l.stats.SkippedExisting += 1
+		stats.SkippedExisting += 1
 	}
 
 	return nil

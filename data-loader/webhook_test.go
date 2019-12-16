@@ -31,9 +31,9 @@ type MockLoader struct {
 	mock.Mock
 }
 
-func (m *MockLoader) LoadAll(sourceContentPath string) error {
+func (m *MockLoader) LoadAll(sourceContentPath string) (*LoaderStats, error) {
 	m.Called(sourceContentPath)
-	return nil
+	return nil, nil
 }
 
 type MockSourceContent struct {
