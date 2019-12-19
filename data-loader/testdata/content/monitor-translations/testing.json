@@ -1,6 +1,7 @@
 {
   "agentType": "TELEGRAF",
   "name": "testing-definition",
+  "description": "this is a test description",
   "translatorSpec": {
     "type": "renameField",
     "from": "just-a-test",
