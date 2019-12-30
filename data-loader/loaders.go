@@ -87,7 +87,7 @@ func setupAndLoad(config *Config, log *zap.SugaredLogger, sourceContent SourceCo
 	return nil
 }
 
-func NewLoader(log *zap.SugaredLogger, identityAuthenticator *IdentityAuthenticator, adminUrl string) (Loader, error) {
+func NewLoader(log *zap.SugaredLogger, identityAuthenticator restclient.Interceptor, adminUrl string) (Loader, error) {
 	ourLogger := log.Named("loader")
 	ourLogger.Debugw("Setting up loader",
 		"adminUrl", adminUrl)
@@ -99,7 +99,7 @@ func NewLoader(log *zap.SugaredLogger, identityAuthenticator *IdentityAuthentica
 	}
 	restClient.Timeout = getterTimeout
 	if identityAuthenticator != nil {
-		restClient.AddInterceptor(identityAuthenticator.Intercept)
+		restClient.AddInterceptor(identityAuthenticator)
 	}
 
 	return &LoaderImpl{
