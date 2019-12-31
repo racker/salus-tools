@@ -92,7 +92,7 @@ func NewLoader(log *zap.SugaredLogger, identityAuthenticator restclient.Intercep
 	ourLogger.Debugw("Setting up loader",
 		"adminUrl", adminUrl)
 
-	restClient := restclient.New()
+	restClient := restclient.NewClient()
 	err := restClient.SetBaseUrl(adminUrl)
 	if err != nil {
 		return nil, fmt.Errorf("invalid admin URL: %w", err)
