@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Rackspace US, Inc.
+ * Copyright 2020 Rackspace US, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,6 +37,7 @@ func TestLoaderImpl_LoadAll(t *testing.T) {
 	// A lot of setup for latching requests and returning canned responses
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/agent-releases", func(w http.ResponseWriter, r *http.Request) {
+		t.Log("handling agent-releases request", r.Method, r.URL.Path)
 		requests = append(requests, r)
 
 		w.WriteHeader(http.StatusOK)
@@ -61,6 +62,7 @@ func TestLoaderImpl_LoadAll(t *testing.T) {
 		}
 	})
 	mux.HandleFunc("/api/monitor-translations", func(w http.ResponseWriter, r *http.Request) {
+		t.Log("handling monitor-translations request", r.Method, r.URL.Path)
 		requests = append(requests, r)
 
 		switch r.Method {
