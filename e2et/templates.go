@@ -57,24 +57,24 @@ agents:
 
 const linuxReleaseData = `{
   "type": "TELEGRAF",
-  "version": "1.11.0",
+  "version": "%s",
   "labels": {
     "agent_discovered_os": "linux",
     "agent_discovered_arch": "amd64"
   },
-  "url": "https://dl.influxdata.com/telegraf/releases/telegraf-1.11.0-static_linux_amd64.tar.gz",
+  "url": "https://dl.influxdata.com/telegraf/releases/telegraf-%s-static_linux_amd64.tar.gz",
   "exe": "./telegraf/telegraf"
 }
 `
 const darwinReleaseData = `{
   "type": "TELEGRAF",
-  "version": "1.11.0",
+  "version": "%s",
   "labels": {
     "agent_discovered_os": "darwin",
     "agent_discovered_arch": "amd64"
   },
-  "url": "https://homebrew.bintray.com/bottles/telegraf-1.11.0.high_sierra.bottle.tar.gz",
-  "exe": "telegraf/1.11.0/bin/telegraf"
+  "url": "https://homebrew.bintray.com/bottles/telegraf-%s.high_sierra.bottle.tar.gz",
+  "exe": "telegraf/%s/bin/telegraf"
 }`
 
 const taskData = `{
@@ -105,7 +105,8 @@ const netMonitorData = `{
     "monitoringZones": ["%s"],
     "plugin": {
       "type": "net_response",
-      "address": "localhost:%s",
+      "host": "localhost",
+      "port": "%s",
       "protocol": "tcp"
     }
   }
@@ -119,8 +120,8 @@ const httpMonitorData = `{
     "type": "remote",
     "monitoringZones": ["%s"],
     "plugin": {
-      "type": "http_response",
-      "address": "http://l:80",
+      "type": "http",
+      "url": "http://l:80",
       "responseTimeout": "3s",
       "method": "GET"
     }

@@ -94,6 +94,7 @@ func initConfig() config {
 	c.envoyTarballDarwin = viper.GetString("envoy.tarball.darwin")
 	c.envoyTarballLinux = viper.GetString("envoy.tarball.linux")
 	c.envoyTimeout = viper.GetDuration("envoy.timeout")
+	c.telegrafVersion = viper.GetString("telegraf.version")
 	checkErr(err, "error converting timeout: "+viper.GetString("envoy.timeout"))
 	return c
 }
@@ -218,8 +219,8 @@ func initEnvoy(c config, releaseId string) (cmd *exec.Cmd) {
 
 func getReleases(c config) string {
 	releaseData := make(map[string]string)
-	releaseData["linux-amd64"] = linuxReleaseData
-	releaseData["darwin-amd64"] = darwinReleaseData
+	releaseData["linux-amd64"] = fmt.Sprintf(linuxReleaseData, c.telegrafVersion, c.telegrafVersion)
+	releaseData["darwin-amd64"] = fmt.Sprintf(darwinReleaseData, c.telegrafVersion, c.telegrafVersion, c.telegrafVersion)
 
 	var ar AgentReleaseType
 	arBody := doReq("GET", c.agentReleaseUrl, "", "getting all agent releases",
@@ -238,7 +239,7 @@ func getReleases(c config) string {
 		}
 	}
 	//create release if none exists
-	if entry.Version == "0.0.0" {
+	if semver.New(entry.Version).LessThan(*semver.New(c.telegrafVersion)) {
 		releaseBody, ok := releaseData[runtime.GOOS+"-"+runtime.GOARCH]
 		if !ok {
 			log.Fatal("no valid release found for this arch")
