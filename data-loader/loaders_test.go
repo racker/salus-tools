@@ -133,6 +133,39 @@ func TestLoaderImpl_LoadAll(t *testing.T) {
 	assert.Equal(t, 0, stats.FailedToCreate)
 }
 
+func TestLoaderDefinitions_validUniqueFieldPaths(t *testing.T) {
+	for _, definition := range loaderDefinitions {
+		assert.NotEmpty(t, definition.UniqueFieldPaths,
+			"%s must have non-empty unique field paths", definition.Name)
+	}
+}
+
+func TestLoaderImpl_identifyExistingContent_emptyUniqueFieldPaths(t *testing.T) {
+	loader := &LoaderImpl{}
+	content := make([]interface{}, 0)
+	_, err := loader.identifyExistingContent(LoaderDefinition{
+		Name:             "testing",
+		ApiPath:          "/api/testing",
+		UniqueFieldPaths: []string{},
+	}, content)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "UniqueFieldPaths cannot be empty")
+}
+
+func TestLoaderImpl_identifyExistingContent_nilUniqueFieldPaths(t *testing.T) {
+	loader := &LoaderImpl{}
+	content := make([]interface{}, 0)
+	_, err := loader.identifyExistingContent(LoaderDefinition{
+		Name:             "testing",
+		ApiPath:          "/api/testing",
+		UniqueFieldPaths: nil,
+	}, content)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "UniqueFieldPaths cannot be empty")
+}
+
 func assertJsonPath(t *testing.T, postedJson interface{}, path string, expected interface{}) {
 	field, err := jsonpath.Read(postedJson, path)
 	require.NoError(t, err)
