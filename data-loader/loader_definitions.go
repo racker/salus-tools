@@ -42,4 +42,22 @@ var loaderDefinitions = []LoaderDefinition{
 			"$.name",
 		},
 	},
+	{
+		Name:    "policy-monitors",
+		ApiPath: "/api/policy-monitors",
+		UniqueFieldPaths: []string{
+			"$.name",
+		},
+	},
+	{
+		Name:    "monitor-metadata-policies",
+		ApiPath: "/api/policy/metadata/monitor",
+		UniqueFieldPaths: []string{
+			"$.scope",
+			"$.subscope",
+			"$.targetClassName",
+			"$.valueType",
+			"$.key",
+		},
+	},
 }
