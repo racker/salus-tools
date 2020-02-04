@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Rackspace US, Inc.
+ * Copyright 2020 Rackspace US, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -93,13 +93,24 @@ func (s *WebhookServer) handleWebhook(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		statsJson, err := json.Marshal(stats)
-		if err != nil {
-			s.log.Warnw("failed marshal stats response",
-				"err", err, "stats", stats)
+		if stats != nil {
+			statsJson, err := json.Marshal(stats)
+			if err != nil {
+				s.log.Warnw("failed marshal stats response",
+					"err", err, "stats", stats)
+			} else {
+				w.Header().Set("Content-Type", string(restclient.JsonType))
+				_, err = w.Write(statsJson)
+				if err != nil {
+					s.log.Warnw("failed to send stats json response", "err", err)
+				}
+			}
 		} else {
-			w.Header().Set("Content-Type", string(restclient.JsonType))
-			_, _ = w.Write(statsJson)
+			w.Header().Set("Content-Type", string(restclient.TextType))
+			_, err = w.Write([]byte("event ref ignored by configuration"))
+			if err != nil {
+				s.log.Warnw("failed to send ref ignored response", "err", err)
+			}
 		}
 
 	default:
