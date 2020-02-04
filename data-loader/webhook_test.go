@@ -255,6 +255,7 @@ func TestWebhookServer_handleWebhook_MisMatchRef(t *testing.T) {
 	bodyBytes, err := ioutil.ReadAll(result.Body)
 	require.NoError(t, err)
 	assert.Equal(t, "event ref ignored by configuration", string(bodyBytes))
+	assert.Equal(t, "text/plain", result.Header.Get("Content-Type"))
 
 	loader.AssertExpectations(t)
 	builder.AssertExpectations(t)
