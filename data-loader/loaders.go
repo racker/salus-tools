@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Rackspace US, Inc.
+ * Copyright 2020 Rackspace US, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -216,6 +216,13 @@ func (UniquenessTracker) formKey(fieldValues []interface{}) string {
 }
 
 func (l *LoaderImpl) identifyExistingContent(definition LoaderDefinition, allContent []interface{}) (UniquenessTracker, error) {
+	// if UniqueFieldPaths is empty then the uniqueness key always becomes an empty string,
+	// in which case, content will load only if a GET for existing content returns nothing. After
+	// that point all existing content via GET will look like it has the same empty-string-key as
+	// the content to be loaded and nothing will get loaded.
+	if len(definition.UniqueFieldPaths) == 0 {
+		return nil, fmt.Errorf("UniqueFieldPaths cannot be empty for %+v", definition)
+	}
 	tracker := make(UniquenessTracker)
 
 	for _, v := range allContent {

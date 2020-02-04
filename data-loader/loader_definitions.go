@@ -36,6 +36,13 @@ var loaderDefinitions = []LoaderDefinition{
 		},
 	},
 	{
+		Name:    "zones",
+		ApiPath: "/api/zones",
+		UniqueFieldPaths: []string{
+			"$.name",
+		},
+	},
+	{
 		Name:    "policy-monitors",
 		ApiPath: "/api/policy-monitors",
 		UniqueFieldPaths: []string{
