@@ -35,4 +35,11 @@ var loaderDefinitions = []LoaderDefinition{
 			"$.name",
 		},
 	},
+	{
+		Name:    "zones",
+		ApiPath: "/api/zones",
+		UniqueFieldPaths: []string{
+			"$.name",
+		},
+	},
 }
