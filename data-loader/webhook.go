@@ -107,7 +107,7 @@ func (s *WebhookServer) handleWebhook(w http.ResponseWriter, r *http.Request) {
 			}
 		} else {
 			w.Header().Set("Content-Type", string(restclient.TextType))
-			_, err = w.Write([]byte("event ref ignored by configuration"))
+			_, err = w.Write([]byte("Ignoring github webhook request for unconfigured branch/tag"))
 			if err != nil {
 				s.log.Warnw("failed to send ref ignored response", "err", err)
 			}
