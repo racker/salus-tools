@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Rackspace US, Inc.
+ * Copyright 2020 Rackspace US, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,10 +17,12 @@
 package main
 
 import (
+	"bytes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -241,11 +243,19 @@ func TestWebhookServer_handleWebhook_MisMatchRef(t *testing.T) {
 	defer reqBody.Close()
 
 	req := createWebhookReq(reqBody, "push", "")
-	resp := &httptest.ResponseRecorder{}
+	resp := &httptest.ResponseRecorder{
+		Body: new(bytes.Buffer),
+	}
 
 	server.handleWebhook(resp, req)
 
-	assert.Equal(t, 200, resp.Code)
+	result := resp.Result()
+
+	assert.Equal(t, 200, result.StatusCode)
+	bodyBytes, err := ioutil.ReadAll(result.Body)
+	require.NoError(t, err)
+	assert.Equal(t, "Ignoring github webhook request for unconfigured branch/tag", string(bodyBytes))
+	assert.Equal(t, "text/plain", result.Header.Get("Content-Type"))
 
 	loader.AssertExpectations(t)
 	builder.AssertExpectations(t)
