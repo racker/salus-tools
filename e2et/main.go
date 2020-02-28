@@ -56,7 +56,7 @@ func initConfig() config {
 	c.currentUUID = uuid.NewV4()
 	c.id = strings.Replace(c.currentUUID.String(), "-", "", -1)
 	c.privateZoneId = "privateZone_" + c.id
-	c.resourceId = "resourceId-" + c.id
+	c.resourceId = "resource-id-" + c.id
 	c.tenantId = viper.GetString("tenant.id")
 	c.publicApiUrl = viper.GetString("public.api.url")
 	c.adminApiUrl = viper.GetString("admin.api.url")
