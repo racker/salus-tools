@@ -1,0 +1,13 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: e2et
+spec:
+  template:
+    spec:
+      containers:
+      - name: e2et
+        image: gcr.io/salus-220516/curl-pod
+        command: ["/bin/bash", "-ec", "curl http://e2e | grep 404"]
+      restartPolicy: Never
+  backoffLimit: 0

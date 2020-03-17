@@ -1,0 +1,7 @@
+steps:
+  # using Docker build caching https://cloud.google.com/cloud-build/docs/kaniko-cache
+  - name: 'gcr.io/kaniko-project/executor:v0.16.0'
+    args:
+      - --context=/workspace/e2et
+      - --destination=gcr.io/$PROJECT_ID/salus-e2e
+      - --cache=true
