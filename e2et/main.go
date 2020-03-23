@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"github.com/coreos/go-semver/semver"
 	"github.com/satori/go.uuid"
+	"github.com/segmentio/kafka-go"
 	"github.com/shirou/gopsutil/process"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
