@@ -6,8 +6,8 @@ substitutions:
 
 steps:
   # using Docker build caching https://cloud.google.com/cloud-build/docs/kaniko-cache
-  - id: COMPILE_AND_PUSH_CONTAINER
-    name: 'gcr.io/kaniko-project/executor:v0.16.0'
+  - name: 'gcr.io/kaniko-project/executor:v0.16.0'
+    id: COMPILE_AND_PUSH_CONTAINER
     args:
       - --context=/workspace/e2et
       - --destination=gcr.io/$PROJECT_ID/salus-e2e
