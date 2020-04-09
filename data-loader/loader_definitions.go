@@ -60,4 +60,11 @@ var loaderDefinitions = []LoaderDefinition{
 			"$.key",
 		},
 	},
+	{
+		Name:    "tenant-metadata",
+		ApiPath: "/api/tenant-metadata",
+		UniqueFieldPaths: []string{
+			"$.tenantId",
+		},
+	},
 }
