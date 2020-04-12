@@ -40,15 +40,10 @@ agents:
 `
 const remoteConfigTemplate = `resource_id: "{{.ResourceId }}"
 zone: {{.PrivateZoneID}}
+auth_token: {{.EnvoyToken}}
 tls:
   auth_service:
     url: {{.AuthUrl}}
-    token_provider: keystone_v2
-  token_providers:
-    keystone_v2:
-      identityServiceUrl: "{{.IdentityUrl}}"
-      username: "{{.RegularId}}"
-      apikey: "{{.ApiKey}}"
 ambassador:
   address: {{.AmbassadorAddress}}
 agents:

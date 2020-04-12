@@ -125,6 +125,8 @@ func runTest() {
 	deleteAgentInstalls(c)
 	deleteResources(c)
 	deleteMonitors(c)
+	deleteEnvoyTokens(c)
+	c.envoyToken = createEnvoyToken(c)
 	deletePrivateZones(c)
 	createPrivateZone(c)
 
@@ -166,10 +168,9 @@ func initEnvoy(c config, releaseId string) (cmd *exec.Cmd) {
 	}
 	tmpl, err := template.New("t1").Parse(configTemplate)
 	checkErr(err, "parsing envoy template")
-
 	err = tmpl.Execute(f, TemplateFields{c.resourceId, c.privateZoneId,
 		c.certDir, c.regularApiKey, c.regularId, c.authUrl, c.ambassadorAddress,
-		c.identityUrl})
+		c.identityUrl, c.envoyToken})
 	checkErr(err, "creating envoy template")
 	err = f.Close()
 	checkErr(err, "closing envoy config file: "+configFileName)
@@ -317,8 +318,31 @@ func deleteMonitors(c config) {
 		err := json.Unmarshal(body, &resp)
 		checkErr(err, "unable to parse get monitors response")
 		for _, i := range resp.Content {
-			// delete each monitor
-			_ = doReq("DELETE", url+i.ID, "", "deleting monitor "+i.ID, c.regularToken)
+			// delete each monitor that is not cloned for a policy
+			if !i.Policy {
+				_ = doReq("DELETE", url+i.ID, "", "deleting monitor "+i.ID, c.regularToken)
+			}
+
+		}
+		if resp.Last {
+			break
+		}
+	}
+}
+
+func deleteEnvoyTokens(c config) {
+	log.Println("deleting Envoy tokens")
+	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/envoy-tokens/"
+	for page := 0; ; page += 1 {
+		pageStr := fmt.Sprintf("?page=%d", page)
+		body := doReq("GET", url+pageStr,
+			"", "getting all envoy tokens", c.regularToken)
+		var resp GetTokensResp
+		err := json.Unmarshal(body, &resp)
+		checkErr(err, "unable to parse get envoy tokens response")
+		for _, i := range resp.Content {
+			// delete each envoy token
+			_ = doReq("DELETE", url+i.Id, "", "deleting envoy token "+i.Id, c.regularToken)
 
 		}
 		if resp.Last {
@@ -466,6 +490,20 @@ func createMonitors(c config) {
 	_ = doReq("POST", url, data, "creating net monitor", c.regularToken)
 	log.Println("monitors created")
 
+}
+
+func createEnvoyToken(c config) string {
+	log.Println("creating Envoy Token")
+
+	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/envoy-tokens/"
+	createOutput := doReq("POST", url, "{}", "creating envoy token", c.regularToken)
+	var resp struct {
+		Token string
+	}
+	err := json.Unmarshal(createOutput, &resp)
+	checkErr(err, "unable to parse create envoy tokens response: "+string(createOutput)+"\ncommand: "+url)
+	log.Println("envoy token created: " + resp.Token)
+	return resp.Token
 }
 
 func deletePolicyMonitors(c config) {
