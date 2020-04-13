@@ -229,16 +229,17 @@ type GetMonitorsResp struct {
 	First         bool `json:"first"`
 }
 
+type GetTokenResp struct {
+	Id    string `json:"id"`
+	Token string `json:"token"`
+}
 type GetTokensResp struct {
-	Content []struct {
-		Id    string      `json:"id"`
-		Token interface{} `json:"token"`
-	} `json:"content"`
-	Number        int  `json:"number"`
-	TotalPages    int  `json:"totalPages"`
-	TotalElements int  `json:"totalElements"`
-	Last          bool `json:"last"`
-	First         bool `json:"first"`
+	Content       []GetTokenResp `json:"content"`
+	Number        int            `json:"number"`
+	TotalPages    int            `json:"totalPages"`
+	TotalElements int            `json:"totalElements"`
+	Last          bool           `json:"last"`
+	First         bool           `json:"first"`
 }
 
 type GetTasksResp struct {

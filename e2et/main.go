@@ -497,9 +497,7 @@ func createEnvoyToken(c config) string {
 
 	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/envoy-tokens/"
 	createOutput := doReq("POST", url, "{}", "creating envoy token", c.regularToken)
-	var resp struct {
-		Token string
-	}
+	var resp GetTokenResp
 	err := json.Unmarshal(createOutput, &resp)
 	checkErr(err, "unable to parse create envoy tokens response: "+string(createOutput)+"\ncommand: "+url)
 	log.Println("envoy token created: " + resp.Token)
