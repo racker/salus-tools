@@ -1,3 +1,10 @@
+
+substitutions:
+  _SALUS_APP: data-loader
+  _APP_NAMESPACE: default
+  _CLOUDSDK_COMPUTE_ZONE: us-east1-b
+  _CLOUDSDK_CONTAINER_CLUSTER: salus-dev
+
 steps:
   - name: 'mirror.gcr.io/library/golang'
     env: ['GO111MODULE=on']
@@ -8,7 +15,28 @@ steps:
       - ./...
   # using Docker build caching https://cloud.google.com/cloud-build/docs/kaniko-cache
   - name: 'gcr.io/kaniko-project/executor:latest'
+    id: BUILD_CONTAINER
     args:
       - --context=/workspace/data-loader
       - --destination=gcr.io/$PROJECT_ID/data-loader
       - --cache=true
+
+  - name: gcr.io/cloud-builders/git
+    id: HELM_CLONE
+    waitFor:
+    - BUILD_CONTAINER
+    args: ['clone', 'https://source.developers.google.com/p/$PROJECT_ID/r/github_rackspace-segment-support_helm-salus-${_SALUS_APP}', '/workspace/helm-salus-${_SALUS_APP}/']
+
+  # Set _CLOUDSDK_COMPUTE_REGION in the build trigger for non-dev clusters
+  - name: 'gcr.io/$PROJECT_ID/helm'
+    id: DEPLOY_APPLICATION
+    waitFor: HELM_CLONE
+    args: ['upgrade', '--install', '${_SALUS_APP}', '--namespace', '${_APP_NAMESPACE}', '/workspace/helm-salus-${_SALUS_APP}']
+    env:
+    - 'CLOUDSDK_COMPUTE_ZONE=${_CLOUDSDK_COMPUTE_ZONE}'
+    - 'CLOUDSDK_COMPUTE_REGION=${_CLOUDSDK_COMPUTE_REGION}'
+    - 'CLOUDSDK_CONTAINER_CLUSTER=${_CLOUDSDK_CONTAINER_CLUSTER}'
+    - 'TILLERLESS=true'
+
+options:
+    substitution_option: 'ALLOW_LOOSE'
