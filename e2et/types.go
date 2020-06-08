@@ -276,21 +276,23 @@ type GetTasksResp struct {
 	First         bool `json:"first"`
 }
 
+type GetPolicyResp struct {
+	ID               string    `json:"id"`
+	Scope            string    `json:"scope"`
+	Subscope         string    `json:"subscope"`
+	CreatedTimestamp time.Time `json:"createdTimestamp"`
+	UpdatedTimestamp time.Time `json:"updatedTimestamp"`
+	Name             string    `json:"name"`
+	MonitorID        string    `json:"monitorId"`
+}
+
 type GetPoliciesResp struct {
-	Content []struct {
-		ID               string    `json:"id"`
-		Scope            string    `json:"scope"`
-		Subscope         string    `json:"subscope"`
-		CreatedTimestamp time.Time `json:"createdTimestamp"`
-		UpdatedTimestamp time.Time `json:"updatedTimestamp"`
-		Name             string    `json:"name"`
-		MonitorID        string    `json:"monitorId"`
-	} `json:"content"`
-	Number        int  `json:"number"`
-	TotalPages    int  `json:"totalPages"`
-	TotalElements int  `json:"totalElements"`
-	Last          bool `json:"last"`
-	First         bool `json:"first"`
+	Content       []GetPolicyResp `json:"content"`
+	Number        int             `json:"number"`
+	TotalPages    int             `json:"totalPages"`
+	TotalElements int             `json:"totalElements"`
+	Last          bool            `json:"last"`
+	First         bool            `json:"first"`
 }
 
 type CreatePolicyMonitorResp struct {
