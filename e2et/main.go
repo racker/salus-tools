@@ -517,7 +517,6 @@ func deletePolicyMonitors(c config) {
 		pageStr := fmt.Sprintf("?page=%d", page)
 		body := doReq("GET", policyUrl+pageStr,
 			"", "getting all policy monitors", c.adminToken)
-		log.Println("gbj delete policy monitor: " + string(body))
 		var resp GetPoliciesResp
 		err := json.Unmarshal(body, &resp)
 		checkErr(err, "unable to parse get policy monitors response")
@@ -527,7 +526,7 @@ func deletePolicyMonitors(c config) {
 				continue
 			}
 
-			// opt out of policy
+			// opt out of policy to remove cloned monitor
 			data := fmt.Sprintf(tenantPolicyData, c.tenantId, i.ID)
 			body = doReq("POST", policyUrl, data, "creating opt out policy", c.adminToken)
 			var resp GetPolicyResp
