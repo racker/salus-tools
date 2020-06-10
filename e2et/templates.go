@@ -123,9 +123,16 @@ const httpMonitorData = `{
   }
 }`
 
-const monitorPolicyData = `{
+const accountTypePolicyData = `{
+  "scope": "ACCOUNT_TYPE",
+  "subscope": "E2ET",
+  "name": "E2ET_%s",
+  "monitorId": "%s"
+}`
+
+const tenantPolicyData = `{
   "scope": "TENANT",
   "subscope": "%s",
   "name": "E2ET_%s",
-  "monitorId": "%s"
+  "monitorId": null
 }`

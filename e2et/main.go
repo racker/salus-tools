@@ -519,15 +519,23 @@ func deletePolicyMonitors(c config) {
 			"", "getting all policy monitors", c.adminToken)
 		var resp GetPoliciesResp
 		err := json.Unmarshal(body, &resp)
-		checkErr(err, "unable to parse get policy monitor response")
+		checkErr(err, "unable to parse get policy monitors response")
 		for _, i := range resp.Content {
-			// Only delete policies for this tenant
-			if i.Subscope != c.tenantId {
+			// Delete e2e account type policies
+			if i.Subscope != "E2ET" {
 				continue
 			}
 
-			// delete each policy
+			// opt out of policy to remove cloned monitor
+			data := fmt.Sprintf(tenantPolicyData, c.tenantId, i.ID)
+			body = doReq("POST", policyUrl, data, "creating opt out policy", c.adminToken)
+			var resp GetPolicyResp
+			err := json.Unmarshal(body, &resp)
+			checkErr(err, "unable to parse get policy monitor response")
+			// delete E2ET policy
 			_ = doReq("DELETE", policyUrl+i.ID, "", "deleting policy "+i.ID, c.adminToken)
+			// delete opt out policy
+			_ = doReq("DELETE", policyUrl+resp.ID, "", "deleting opt out policy "+resp.ID, c.adminToken)
 			// delete the corresponding monitor
 			_ = doReq("DELETE", monitorUrl+i.MonitorID, "", "deleting policy monitor "+i.MonitorID, c.adminToken)
 		}
@@ -551,9 +559,9 @@ func createPolicyMonitor(c config) {
 	body := doReq("POST", monitorUrl, data, "creating policy monitor", c.adminToken)
 	var resp CreatePolicyMonitorResp
 	err := json.Unmarshal(body, &resp)
-	checkErr(err, "createing policy monitor")
+	checkErr(err, "creating policy monitor")
 	// Now create new monitor policy
-	data = fmt.Sprintf(monitorPolicyData, c.tenantId, resp.ID, resp.ID)
+	data = fmt.Sprintf(accountTypePolicyData, resp.ID, resp.ID)
 	_ = doReq("POST", policyUrl, data, "creating monitor policy", c.adminToken)
 
 }
