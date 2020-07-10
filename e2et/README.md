@@ -7,6 +7,11 @@ Running *make* creates the e2et exe.  The exe is run with a config file, like so
 ./e2et   -config=config.yml
 ```
 
+## Running Locally
+When running in your local environment all services must be started and various data must have been loaded in to the APIs, such as any monitor translations.  This step can be completed by utilizing the [data-loader](https://github.com/racker/salus-tools/tree/master/data-loader) along with any yaml config files used in your deployment.
+
+Additionally, a [local test config](config-local.yml) is provided for use with the `e2et` command in this scenario.
+
 ## Configuration
 There are two basic modes in which the tests run, local and full, (depending on the corresponding value in the config file).  Local mode is a slightly stripped down version, meant to run on your laptop.  It requires less configuration, mostly of ssl certs etc, (you should just be able to run included config-local.yml file without changes.)  It also doesn't use a public poller or auth service so you don't need to set those up separately.  Just start the other services locally, and run the commands:
 ```
@@ -15,7 +20,8 @@ make
 ```
 It should all work.
 
-Full mode excercises everything including the auth service, and public pollers and requires significantly more configuration.  It requires a regular user account as well as an admin account.  A sample full config file is [here](./config-dev.yml).  In addition, it requires the following env vars to be set:
+Full mode exercises everything including the auth service, and public pollers and requires significantly more configuration.  It requires a regular user account as well as an admin account.  A sample full config file is [here](./config-dev.yml).  In addition, it requires the following env vars to be set:
+
 ```
 E2ET_REGULAR_API_KEY   the api key of regular user account
 E2ET_ADMIN_API_KEY     the api key of admin user account

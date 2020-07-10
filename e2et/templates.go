@@ -79,14 +79,17 @@ const taskData = `{
 		"labelSelector": {
 			"agent_discovered_os": "%s"
 		},
-		"critical": {
-			"consecutiveCount": 1,
-			"expression": {
-				"field": "result_code",
-				"threshold": -1,
-				"comparator": ">"
+		"stateExpressions": [
+			{
+				"state": "CRITICAL",
+				"expression": {
+						"type": "comparison",
+						"comparator": ">",
+						"metricName": "result_code",
+						"comparisonValue": -1
+				}
 			}
-		}
+		]
 	}
 }`
 

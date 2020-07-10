@@ -73,8 +73,9 @@ func initConfig() config {
 	checkErr(err, "error creating temp dir")
 	c.dir = dir
 	log.Info("Temp dir is : " + c.dir)
-	c.kafkaBrokers = strings.Split(viper.GetString("kafka.brokers"), ",")
+	c.kafkaBrokers = viper.GetStringSlice("kafka.brokers")
 	c.eventTopic = viper.GetString("event.topic")
+	c.eventTimeout = viper.GetDuration("event.timeout")
 	c.identityUrl = viper.GetString("identity.url")
 	c.authUrl = viper.GetString("auth.url")
 	c.ambassadorAddress = viper.GetString("ambassador.address")
@@ -91,7 +92,6 @@ func initConfig() config {
 	c.envoyExeName = "e2et-envoy-" + c.tenantId
 	c.envoyTarballDarwin = viper.GetString("envoy.tarball.darwin")
 	c.envoyTarballLinux = viper.GetString("envoy.tarball.linux")
-	c.envoyTimeout = viper.GetDuration("envoy.timeout")
 	c.telegrafVersion = viper.GetString("telegraf.version")
 	checkErr(err, "error converting timeout: "+viper.GetString("envoy.timeout"))
 	return c
@@ -140,11 +140,11 @@ func runTest() {
 	deletePolicyMonitors(c)
 	createPolicyMonitor(c)
 	checkPresenceMonitor(c)
-	log.Println("looking for events:")
+	log.Println("waiting for events from brokers: " + strings.Join(c.kafkaBrokers, ", "))
 	select {
 	case <-eventFound:
 		log.Println("events returned from kafka successfully")
-	case <-time.After(c.envoyTimeout):
+	case <-time.After(c.eventTimeout):
 		log.Fatal("Timed out waiting for events")
 	}
 
@@ -209,7 +209,7 @@ func initEnvoy(c config, releaseId string) (cmd *exec.Cmd) {
 
 	_ = doReq("POST", url, fmt.Sprintf(installData, releaseId, runtime.GOOS), "creating agent install", c.regularToken)
 	// give it time to install
-	time.Sleep(20 * time.Second)
+	time.Sleep(30 * time.Second)
 	_, err = os.Stat(c.dir + "/data-telemetry-envoy")
 	checkErr(err, "envoy failed")
 	log.Println("envoy started")
@@ -407,15 +407,19 @@ func createTasks(c config) {
 	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/event-tasks/"
 	data := fmt.Sprintf(taskData, "net_response_task_"+c.id, "net_response", runtime.GOOS)
 	_ = doReq("POST", url, data, "creating net task", c.regularToken)
-	data = fmt.Sprintf(taskData, "http_response_task_"+c.id, "http_response", runtime.GOOS)
-	_ = doReq("POST", url, data, "creating http task", c.regularToken)
+	if c.mode != "local" {
+		data = fmt.Sprintf(taskData, "http_response_task_"+c.id, "http_response", runtime.GOOS)
+		_ = doReq("POST", url, data, "creating http task", c.regularToken)
+	}
 }
 
 func checkForEvents(c config, eventFound chan bool) {
 	var r *kafka.Reader
 	finishedMap := make(map[string]bool)
 	finishedMap["net"] = false
-	finishedMap["http"] = false
+	if c.mode != "local" {
+		finishedMap["http"] = false
+	}
 	if c.mode != "prod" {
 		r = kafka.NewReader(kafka.ReaderConfig{
 			Brokers:  c.kafkaBrokers,
@@ -452,7 +456,7 @@ func checkForEvents(c config, eventFound chan bool) {
 			Dialer:   dialer,
 		})
 	}
-	log.Println("waiting for events")
+	log.Println("waiting for events from brokers: " + strings.Join(c.kafkaBrokers, ", "))
 	for {
 		m, err := r.ReadMessage(context.Background())
 		checkErr(err, "reading kafka")
@@ -555,14 +559,16 @@ func createPolicyMonitor(c config) {
 	monitorUrl := c.adminApiUrl + "api/policy-monitors/"
 
 	// Now create new policy monitor
-	data := fmt.Sprintf(httpMonitorData, runtime.GOOS, c.publicZoneId)
-	body := doReq("POST", monitorUrl, data, "creating policy monitor", c.adminToken)
-	var resp CreatePolicyMonitorResp
-	err := json.Unmarshal(body, &resp)
-	checkErr(err, "creating policy monitor")
-	// Now create new monitor policy
-	data = fmt.Sprintf(accountTypePolicyData, resp.ID, resp.ID)
-	_ = doReq("POST", policyUrl, data, "creating monitor policy", c.adminToken)
+	if c.mode != "local" {
+		data := fmt.Sprintf(httpMonitorData, runtime.GOOS, c.publicZoneId)
+		body := doReq("POST", monitorUrl, data, "creating policy monitor", c.adminToken)
+		var resp CreatePolicyMonitorResp
+		err := json.Unmarshal(body, &resp)
+		checkErr(err, "creating policy monitor")
+		// Now create new monitor policy
+		data = fmt.Sprintf(accountTypePolicyData, resp.ID, resp.ID)
+		_ = doReq("POST", policyUrl, data, "creating monitor policy", c.adminToken)
+	}
 
 }
 
