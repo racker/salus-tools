@@ -69,6 +69,7 @@ type config = struct {
 	dir                string
 	kafkaBrokers       []string
 	eventTopic         string
+	eventTimeout       time.Duration
 	port               string
 	certFile           string
 	keyFile            string
@@ -81,7 +82,6 @@ type config = struct {
 	authUrl            string
 	ambassadorAddress  string
 	envoyExeName       string
-	envoyTimeout       time.Duration
 	envoyTarballLinux  string
 	envoyTarballDarwin string
 	telegrafVersion    string
