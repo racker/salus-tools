@@ -248,21 +248,15 @@ type GetTasksResp struct {
 		Name           string `json:"name"`
 		Measurement    string `json:"measurement"`
 		TaskParameters struct {
-			Info     interface{} `json:"info"`
-			Warning  interface{} `json:"warning"`
-			Critical struct {
-				Expression struct {
-					Field      string `json:"field"`
-					Threshold  int    `json:"threshold"`
-					Comparator string `json:"comparator"`
-				} `json:"expression"`
-				ConsecutiveCount int `json:"consecutiveCount"`
-			} `json:"critical"`
-			EvalExpressions   interface{} `json:"evalExpressions"`
-			WindowLength      interface{} `json:"windowLength"`
-			WindowFields      interface{} `json:"windowFields"`
-			FlappingDetection bool        `json:"flappingDetection"`
-			LabelSelector     struct {
+			StateExpressions      []interface{} `json:"stateExpressions"`
+			CriticalStateDuration string        `json:"criticalStateDuration"`
+			WarningStateDuration  string        `json:"warningStateDuration"`
+			InfoStateDuration     string        `json:"infoStateDuration"`
+			CustomMetrics         []interface{} `json:"customMetrics"`
+			WindowLength          interface{}   `json:"windowLength"`
+			WindowFields          interface{}   `json:"windowFields"`
+			FlappingDetection     bool          `json:"flappingDetection"`
+			LabelSelector         struct {
 				AgentEnvironment string `json:"agent_environment"`
 			} `json:"labelSelector"`
 		} `json:"taskParameters"`
