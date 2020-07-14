@@ -252,7 +252,7 @@ type GetTasksResp struct {
 			CriticalStateDuration string        `json:"criticalStateDuration"`
 			WarningStateDuration  string        `json:"warningStateDuration"`
 			InfoStateDuration     string        `json:"infoStateDuration"`
-			CustomMetrics         interface{}   `json:"customMetrics"`
+			CustomMetrics         []interface{} `json:"customMetrics"`
 			WindowLength          interface{}   `json:"windowLength"`
 			WindowFields          interface{}   `json:"windowFields"`
 			FlappingDetection     bool          `json:"flappingDetection"`
