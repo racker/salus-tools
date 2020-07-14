@@ -3,8 +3,7 @@ regular.id: <normal rackspace user name>
 tenant.id: <rackspace tenant id>
 public.api.url:  <dev public api>
 admin.api.url:  <dev admin api>
-kafka.brokers:
-  - <dev kafka broker>
+kafka.brokers: <dev kafka broker>
 event.topic:  <dev kafka topic>
 cert.file: <kafka client cert file>
 ca.file: <kafka ca file>
