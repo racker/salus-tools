@@ -30,7 +30,8 @@ steps:
   # Set _CLOUDSDK_COMPUTE_REGION in the build trigger for non-dev clusters
   - name: 'gcr.io/$PROJECT_ID/helm'
     id: DEPLOY_APPLICATION
-    waitFor: HELM_CLONE
+    waitFor:
+    - HELM_CLONE
     args: ['upgrade', '--install', '${_SALUS_APP}', '--namespace', '${_APP_NAMESPACE}', '/workspace/helm-salus-${_SALUS_APP}']
     env:
     - 'CLOUDSDK_COMPUTE_ZONE=${_CLOUDSDK_COMPUTE_ZONE}'
