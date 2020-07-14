@@ -73,7 +73,8 @@ func initConfig() config {
 	checkErr(err, "error creating temp dir")
 	c.dir = dir
 	log.Info("Temp dir is : " + c.dir)
-	c.kafkaBrokers = viper.GetStringSlice("kafka.brokers")
+	// kafka.brokers is a comma-separated string, as required by spring boot apps
+	c.kafkaBrokers = strings.Split(viper.GetString("kafka.brokers"), ",")
 	c.eventTopic = viper.GetString("event.topic")
 	c.eventTimeout = viper.GetDuration("event.timeout")
 	c.identityUrl = viper.GetString("identity.url")
