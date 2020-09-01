@@ -58,7 +58,6 @@ public class SwaggerJsonConverter {
             Map.Entry<String, JsonNode> elt = it.next();
             String newKey = elt.getKey();
             boolean containsTenant = newKey.contains("tenant");
-            boolean containsAdmin = newKey.contains("admin");
             for(int i = 1; i < args.length; i++) {
                 String[] splitValues = args[i].split(argDelimiter);
                 newKey = newKey.replace(splitValues[0], splitValues.length == 1? "" : splitValues[1]);
