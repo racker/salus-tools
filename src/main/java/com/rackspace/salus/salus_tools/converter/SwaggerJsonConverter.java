@@ -54,14 +54,11 @@ public class SwaggerJsonConverter {
         Map<String, JsonNode> publicTemp = new HashMap<>();
         Map<String, JsonNode> adminTemp = new HashMap<>();
 
-        String newKey;
-        boolean containsTenant;
-        boolean containsAdmin;
         for (Iterator<Map.Entry<String, JsonNode>> it = publicRoot.get("paths").fields(); it.hasNext(); ) {
             Map.Entry<String, JsonNode> elt = it.next();
-            newKey = elt.getKey();
-            containsTenant = newKey.contains("tenant");
-            containsAdmin = newKey.contains("admin");
+            String newKey = elt.getKey();
+            boolean containsTenant = newKey.contains("tenant");
+            boolean containsAdmin = newKey.contains("admin");
             for(int i = 1; i < args.length; i++) {
                 String[] splitValues = args[i].split(argDelimiter);
                 newKey = newKey.replace(splitValues[0], splitValues.length == 1? "" : splitValues[1]);
@@ -83,7 +80,7 @@ public class SwaggerJsonConverter {
             });*/
             if(containsTenant) {
               publicTemp.put(newKey, elt.getValue());
-            }else if(containsAdmin){
+            }else {
               adminTemp.put(newKey, elt.getValue());
             }
 
