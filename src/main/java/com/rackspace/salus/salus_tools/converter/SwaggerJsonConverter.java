@@ -37,12 +37,12 @@ public class SwaggerJsonConverter {
     private static final String argDelimiter="=";
 
     /**
-     * This function
+     * This function will generate both public and admin swagger json splitting it where the public docs have
+     * /tenant/{tenantId} or {tenantId} in the path and the admin api has /admin in the path
      * @param args
-     * 0. path to the location that the swagger.json is and to where we will output the resultant json/html from this
-     * 1. path/filename of hbs template to be used when the html is generated.
-     * 2. should be "tenant/{tenantId}"= or {tenandId}= depending on whether the API has /tenant in the path
-     * 3. Each succeeding argument should be in the format "StringToBeReplaced"="replacementText".
+     * 0. path to the location that the swagger.json is and to where we will output the resultant json
+     * 1. should be "tenant/{tenantId}"= or {tenandId}= depending on whether the API has /tenant in the path
+     * 2. Each succeeding argument should be in the format "StringToBeReplaced"="replacementText".
      *    If you want to remove a string then it should be "StringToBeReplaced"=    with no replacmentText
      * @throws Exception
      */
