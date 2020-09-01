@@ -1,3 +1,20 @@
+/*
+ * Copyright 2020 Rackspace US, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
 package com.rackspace.salus.salus_tools.converter;
 
 
@@ -20,28 +37,28 @@ public class SwaggerJsonConverter {
     private static final String argDelimiter="=";
 
     /**
-     * This function
+     * This function will generate both public and admin swagger json splitting it where the public docs have
+     * /tenant/{tenantId} or {tenantId} in the path and assume that anything else is an admin api
      * @param args
-     * 0. path to the location that the swagger.json is and to where we will output the resultant json/html from this
-     * 1. path/filename of hbs template to be used when the html is generated.
-     * 2. should be "tenant/{tenantId}"= or {tenandId}= depending on whether the API has /tenant in the path
-     * 3. Each succeeding argument should be in the format "StringToBeReplaced"="replacementText".
+     * 0. path to the location that the swagger.json is and to where we will output the resultant json
+     * 1. should be "tenant/{tenantId}"= or {tenandId}= depending on whether the API has /tenant in the path
+     * 2. Each succeeding argument should be in the format "StringToBeReplaced"="replacementText".
      *    If you want to remove a string then it should be "StringToBeReplaced"=    with no replacmentText
      * @throws Exception
      */
     public static void main(String[] args) throws Exception {
         ObjectMapper mapper = new ObjectMapper();
         String content = new Scanner(new File(args[0]+"/swagger.json")).useDelimiter("\\Z").next();
-        ObjectNode root = (ObjectNode)mapper.readTree(content);
-        Map<String, JsonNode> temp = new HashMap<>();
+        ObjectNode publicRoot = (ObjectNode)mapper.readTree(content);
+        ObjectNode adminRoot = (ObjectNode)mapper.readTree(content);
+        Map<String, JsonNode> publicTemp = new HashMap<>();
+        Map<String, JsonNode> adminTemp = new HashMap<>();
 
-        String newKey;
-        boolean containsTenant;
-        for (Iterator<Map.Entry<String, JsonNode>> it = root.get("paths").fields(); it.hasNext(); ) {
+        for (Iterator<Map.Entry<String, JsonNode>> it = publicRoot.get("paths").fields(); it.hasNext(); ) {
             Map.Entry<String, JsonNode> elt = it.next();
-            newKey = elt.getKey();
-            containsTenant = newKey.contains("tenant");
-            for(int i = 2; i < args.length; i++) {
+            String newKey = elt.getKey();
+            boolean containsTenant = newKey.contains("tenant");
+            for(int i = 1; i < args.length; i++) {
                 String[] splitValues = args[i].split(argDelimiter);
                 newKey = newKey.replace(splitValues[0], splitValues.length == 1? "" : splitValues[1]);
             }
@@ -61,40 +78,30 @@ public class SwaggerJsonConverter {
                 }
             });*/
             if(containsTenant) {
-                temp.put(newKey, elt.getValue());
+              publicTemp.put(newKey, elt.getValue());
+            }else {
+              adminTemp.put(newKey, elt.getValue());
             }
 
             it.remove();
         }
-        ObjectNode pathNode = mapper.getNodeFactory().objectNode();
+        ObjectNode publicPathNode = mapper.getNodeFactory().objectNode();
+        ObjectNode adminPathNode = mapper.getNodeFactory().objectNode();
 
-        temp.forEach((key, node)->{
-            pathNode.set(key, node);
+        publicTemp.forEach((key, node)->{
+            publicPathNode.set(key, node);
         });
-        root.set("paths", pathNode);
-        mapper.writeValue(new java.io.File(args[0]+"/convertedOutput.json"), (JsonNode)root);
 
-        generateHtml(args, mapper, root);
-    }
+        adminTemp.forEach((key, node)-> {
+          adminPathNode.set(key, node);
+        });
 
-    private static void generateHtml(String[] args, ObjectMapper mapper, JsonNode root)
-        throws Exception {
+        // generate the admin swagger json
+        adminRoot.set("paths", adminPathNode);
+        mapper.writeValue(new java.io.File(args[0]+"/adminConvertedOutput.json"), (JsonNode)adminRoot);
 
-        // Configure the generator
-        ApiSource apiSource = new ApiSource();
-        apiSource.setOutputPath(args[0] + "/converted.html");
-        apiSource.setTemplatePath(args[1]);
-
-        // Clear out some configuration to reduce the work done by the generator
-        Info info = new Info();
-        apiSource.setHost("");
-        apiSource.setBasePath("");
-        apiSource.setInfo(info);
-        Log log = new SystemStreamLog();
-
-        // Invoke the generator used by the swagger maven plugin
-        HtmlGenerator htmlGenerator = new HtmlGenerator(apiSource, log, mapper.writeValueAsString(
-            root));
-        htmlGenerator.toDocuments();
+        // generate the public swagger json
+        publicRoot.set("paths", publicPathNode);
+        mapper.writeValue(new java.io.File(args[0]+"/convertedOutput.json"), (JsonNode)publicRoot);
     }
 }
