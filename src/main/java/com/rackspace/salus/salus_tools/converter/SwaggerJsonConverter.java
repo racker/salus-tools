@@ -38,7 +38,7 @@ public class SwaggerJsonConverter {
 
     /**
      * This function will generate both public and admin swagger json splitting it where the public docs have
-     * /tenant/{tenantId} or {tenantId} in the path and the admin api has /admin in the path
+     * /tenant/{tenantId} or {tenantId} in the path and assume that anything else is an admin api
      * @param args
      * 0. path to the location that the swagger.json is and to where we will output the resultant json
      * 1. should be "tenant/{tenantId}"= or {tenandId}= depending on whether the API has /tenant in the path
