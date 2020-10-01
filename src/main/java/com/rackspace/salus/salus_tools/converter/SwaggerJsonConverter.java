@@ -22,16 +22,11 @@ package com.rackspace.salus.salus_tools.converter;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-
-import com.github.kongchen.swagger.docgen.mavenplugin.ApiSource;
-import io.swagger.models.Info;
 import java.io.File;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Scanner;
-import org.apache.maven.plugin.logging.Log;
-import org.apache.maven.plugin.logging.SystemStreamLog;
 
 public class SwaggerJsonConverter {
     private static final String argDelimiter="=";
@@ -49,6 +44,10 @@ public class SwaggerJsonConverter {
     public static void main(String[] args) throws Exception {
         ObjectMapper mapper = new ObjectMapper();
         String content = new Scanner(new File(args[0]+"/swagger.json")).useDelimiter("\\Z").next();
+        generateOutputJson(mapper, content, args);
+    }
+
+    private static void generateOutputJson(ObjectMapper mapper, String content, String... args) throws Exception  {
         ObjectNode publicRoot = (ObjectNode)mapper.readTree(content);
         ObjectNode adminRoot = (ObjectNode)mapper.readTree(content);
         Map<String, JsonNode> publicTemp = new HashMap<>();
@@ -78,9 +77,9 @@ public class SwaggerJsonConverter {
                 }
             });*/
             if(containsTenant) {
-              publicTemp.put(newKey, elt.getValue());
+                publicTemp.put(newKey, elt.getValue());
             }else {
-              adminTemp.put(newKey, elt.getValue());
+                adminTemp.put(newKey, elt.getValue());
             }
 
             it.remove();
@@ -93,15 +92,23 @@ public class SwaggerJsonConverter {
         });
 
         adminTemp.forEach((key, node)-> {
-          adminPathNode.set(key, node);
+            adminPathNode.set(key, node);
         });
 
         // generate the admin swagger json
         adminRoot.set("paths", adminPathNode);
-        mapper.writeValue(new java.io.File(args[0]+"/adminConvertedOutput.json"), (JsonNode)adminRoot);
+        mapper.writeValue(new java.io.File(args[0],"adminConvertedOutput.json"), (JsonNode)adminRoot);
+
+        File adminDir = new File(args[0],"admin");
+        adminDir.mkdirs();
+        mapper.writeValue(new java.io.File(adminDir, "swagger.json"), (JsonNode)adminRoot);
 
         // generate the public swagger json
         publicRoot.set("paths", publicPathNode);
-        mapper.writeValue(new java.io.File(args[0]+"/convertedOutput.json"), (JsonNode)publicRoot);
+        mapper.writeValue(new java.io.File(args[0], "convertedOutput.json"), (JsonNode)publicRoot);
+
+        File publicDir = new File(args[0],"public");
+        publicDir.mkdirs();
+        mapper.writeValue(new java.io.File(publicDir, "swagger.json"), (JsonNode)publicRoot);
     }
 }
