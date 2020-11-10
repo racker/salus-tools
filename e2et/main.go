@@ -406,10 +406,10 @@ func deleteTasks(c config) {
 func createTasks(c config) {
 	log.Println("create Tasks")
 	url := c.publicApiUrl + "v1.0/tenant/" + c.tenantId + "/event-tasks/"
-	data := fmt.Sprintf(taskData, "net_response_task_"+c.id, "net_response", runtime.GOOS)
+	data := fmt.Sprintf(taskData, "net_response_task_"+c.id, "net_response", "net", runtime.GOOS)
 	_ = doReq("POST", url, data, "creating net task", c.regularToken)
 	if c.mode != "local" {
-		data = fmt.Sprintf(taskData, "http_response_task_"+c.id, "http_response", runtime.GOOS)
+		data = fmt.Sprintf(taskData, "http_response_task_"+c.id, "http_response", "http", runtime.GOOS)
 		_ = doReq("POST", url, data, "creating http task", c.regularToken)
 	}
 }
