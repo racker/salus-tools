@@ -75,6 +75,9 @@ const darwinReleaseData = `{
 const taskData = `{
 	"name": "%s",
 	"measurement": "%s",
+	"monitoringSystem": "salus",
+	"monitorScope": "remote",
+	"monitorType": "%s",
 	"taskParameters": {
 		"labelSelector": {
 			"agent_discovered_os": "%s"
