@@ -48,4 +48,6 @@ The following provides the major steps needed:
 - In the "Recent Deliveries" section of the temporary web hook you should see a "ping" delivery that was successful
   - In the data loader debug logs you should also see a message like `ignoring unsupported webhook event type {"type": "*github.PingEvent"}`
 - Clone the salus-data-loader-content repo, create a local branch, and push some "testing changes" such as whitespace additions to the `README.md` to trigger webhooks that can be executed by data-loader
+
+> NOTE: When finished, be sure to stop the ngrok process and delete the webhook declared in the repository settings.
     
