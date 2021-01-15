@@ -111,6 +111,7 @@ func NewLoader(log *zap.SugaredLogger, identityAuthenticator restclient.Intercep
 func (l *LoaderImpl) LoadAll(sourceContentPath string) (*LoaderStats, error) {
 
 	stats := &LoaderStats{}
+	var err1 error
 
 	for _, definition := range loaderDefinitions {
 		err := l.load(definition, sourceContentPath, stats)
@@ -118,13 +119,14 @@ func (l *LoaderImpl) LoadAll(sourceContentPath string) (*LoaderStats, error) {
 			l.log.Warnw("failed to process loader definition",
 				"err", err,
 				"definition", definition)
-			// but continue with other definitions
+			//but continue with other definitions
+			err1 = err
 		}
 	}
 
 	l.log.Infow("loaded content", "stats", stats)
 
-	return stats, nil
+	return stats, err1
 }
 
 func (l *LoaderImpl) load(definition LoaderDefinition, sourceContentPath string, stats *LoaderStats) error {
