@@ -43,8 +43,8 @@ var loaderDefinitions = []LoaderDefinition{
 		},
 	},
 	{
-		Name:    "policy-monitors",
-		ApiPath: "/api/policy-monitors",
+		Name:    "monitor-templates",
+		ApiPath: "/api/monitor-templates",
 		UniqueFieldPaths: []string{
 			"$.name",
 		},
