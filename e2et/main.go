@@ -516,7 +516,7 @@ func deletePolicyMonitors(c config) {
 	}
 	log.Println("deleting policy monitors")
 	policyUrl := c.adminApiUrl + "api/policies/monitors/"
-	monitorUrl := c.adminApiUrl + "api/policy-monitors/"
+	monitorUrl := c.adminApiUrl + "api/monitor-templates/"
 
 	for page := 0; ; page += 1 {
 		pageStr := fmt.Sprintf("?page=%d", page)
